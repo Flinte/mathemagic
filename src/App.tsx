@@ -907,6 +907,14 @@ export default function App() {
   });
 
   const [pendingWin, setPendingWin] = useState<{ sticker: string; category: Category } | null>(null);
+  const panRef = useRef<HTMLDivElement>(null);
+
+  // Auf schmalen Geräten ist die Karte breiter als der Bildschirm — dann in der
+  // Mitte starten statt am linken Rand, sonst sieht man nur Wald.
+  useEffect(() => {
+    const el = panRef.current;
+    if (el) el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+  }, [state.category]);
 
   const totalStickers = Object.values(state.stickers).flat().length;
   const currentTier = [...ANIMAL_TIERS].reverse().find(t => totalStickers >= t.threshold);
@@ -967,8 +975,8 @@ export default function App() {
 
       {/* header */}
       <div className="map-header">
-        <h1 className="village-title" style={{ margin: 0, fontSize: '2.2rem', padding: '8px 32px' }}>
-          Mathe-Dorf 🏘️
+        <h1 className="village-title map-title" style={{ margin: 0 }}>
+          Julia's Mathe-Dorf 🏘️
         </h1>
         <div className="map-score-pill">
           {currentTier ? currentTier.emoji : '🐣'}&nbsp;
@@ -977,7 +985,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* map */}
+      {/* map — auf schmalen Geräten horizontal wischbar */}
+      <div className="map-pan" ref={panRef}>
       <div className="map-viewport">
         <MapTerrain />
 
@@ -1029,6 +1038,9 @@ export default function App() {
           <span>{currentTier ? currentTier.emoji : '🐣'}</span>
         </div>
       </div>
+      </div>
+
+      <div className="map-swipe-hint">← wischen, um das ganze Dorf zu sehen →</div>
 
       <button className="reset-btn" onClick={reset}><Trash2 size={14} /> Reset</button>
     </div>
