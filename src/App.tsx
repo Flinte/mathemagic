@@ -128,145 +128,206 @@ const generateProblem = (category: Category, _performance: PerformanceData = {})
 // MAP COMPONENTS
 // ============================================================
 
+// Bäume: Positionen in Karten-Koordinaten (viewBox 1300×700)
+const TREE_SPOTS: { x: number; y: number; s?: number }[] = [
+  { x: 39, y: 56 }, { x: 91, y: 35, s: 0.72 }, { x: 52, y: 126, s: 0.72 },
+  { x: 143, y: 77 }, { x: 195, y: 49, s: 0.72 }, { x: 104, y: 175 },
+  { x: 1157, y: 42 }, { x: 1222, y: 63, s: 0.72 }, { x: 1183, y: 126, s: 0.72 },
+  { x: 1261, y: 98 }, { x: 1118, y: 91, s: 0.72 },
+  { x: 325, y: 42, s: 0.72 }, { x: 377, y: 63 }, { x: 351, y: 98, s: 0.72 },
+  { x: 819, y: 476 }, { x: 858, y: 448, s: 0.72 },
+  { x: 650, y: 546, s: 0.72 }, { x: 728, y: 518 },
+  { x: 416, y: 602, s: 0.72 }, { x: 468, y: 630, s: 0.72 },
+  { x: 26, y: 350, s: 0.72 }, { x: 1274, y: 336, s: 0.72 },
+];
+
+// Grasbüschel an den Wegrändern — brechen die Silhouette auf, damit der Weg
+// nicht wie aufgeklebt wirkt. Das ist der eigentliche Trick.
+const PATH_TUFTS: [number, number][] = [
+  [60, 393], [150, 384], [250, 382], [360, 435], [470, 443], [560, 397],
+  [640, 441], [740, 388], [830, 431], [930, 383], [1030, 430], [1120, 385],
+  [1210, 427], [1270, 378], [78, 470], [146, 502], [96, 538], [166, 568],
+  [458, 360], [500, 300], [452, 240], [600, 158], [700, 192], [750, 152],
+  [952, 300], [1010, 380], [958, 460], [300, 450], [280, 520], [310, 570],
+];
+
+// Erdflecken im Weginneren. Bewusst ungleichmäßig gestreut und unterschiedlich
+// gedreht: jede durchgehende Längsstruktur liest sich sofort wieder als Straße.
+const PATH_SPECKS: [number, number, number, number, number, string][] = [
+  [40, 428, 7, 4, -12, '#cfb185'], [88, 410, 5, 3, 8, '#f3e7c6'], [130, 421, 9, 4, -6, '#c7a878'],
+  [176, 402, 4, 2.5, 14, '#bda06f'], [220, 412, 7, 3.5, -9, '#f3e7c6'], [268, 398, 5, 3, 6, '#cfb185'],
+  [312, 418, 8, 4, -14, '#c7a878'], [356, 400, 4, 2.5, 10, '#bda06f'], [400, 424, 6, 3, -5, '#f3e7c6'],
+  [446, 406, 7, 3.5, 12, '#cfb185'], [490, 428, 5, 3, -8, '#f3e7c6'], [534, 410, 9, 4, 4, '#c7a878'],
+  [578, 430, 4, 2.5, -11, '#bda06f'], [622, 408, 6, 3.5, 9, '#f3e7c6'], [666, 426, 8, 4, -6, '#cfb185'],
+  [710, 404, 5, 3, 13, '#f3e7c6'], [754, 422, 7, 3.5, -9, '#c7a878'], [798, 400, 4, 2.5, 5, '#bda06f'],
+  [842, 416, 9, 4, -13, '#cfb185'], [886, 396, 6, 3, 8, '#f3e7c6'], [930, 418, 5, 3, -7, '#c7a878'],
+  [974, 398, 7, 3.5, 11, '#f3e7c6'], [1018, 420, 4, 2.5, -5, '#bda06f'], [1062, 400, 8, 4, 9, '#cfb185'],
+  [1106, 418, 6, 3, -12, '#f3e7c6'], [1150, 396, 5, 3, 6, '#c7a878'], [1194, 414, 7, 3.5, -8, '#f3e7c6'],
+  [1238, 394, 4, 2.5, 12, '#bda06f'], [1278, 408, 6, 3, -6, '#cfb185'],
+  [104, 442, 5, 3, -10, '#cfb185'], [116, 476, 4, 2.5, 8, '#f3e7c6'], [126, 512, 6, 3, -6, '#c7a878'],
+  [134, 548, 4, 2.5, 12, '#bda06f'], [142, 582, 5, 3, -9, '#f3e7c6'],
+  [478, 386, 5, 3, 7, '#cfb185'], [474, 330, 4, 2.5, -11, '#f3e7c6'], [472, 268, 6, 3, 6, '#c7a878'],
+  [476, 214, 4, 2.5, -8, '#bda06f'],
+  [590, 184, 5, 3, 9, '#f3e7c6'], [660, 174, 4, 2.5, -7, '#cfb185'], [736, 174, 5, 3, 11, '#c7a878'],
+  [826, 178, 4, 2.5, -6, '#f3e7c6'], [922, 202, 5, 3, 8, '#bda06f'],
+  [976, 300, 5, 3, -9, '#cfb185'], [988, 366, 4, 2.5, 7, '#f3e7c6'], [990, 434, 5, 3, -12, '#c7a878'],
+  [978, 490, 4, 2.5, 6, '#bda06f'],
+  [312, 452, 4, 2.5, -8, '#f3e7c6'], [302, 516, 5, 3, 10, '#cfb185'], [294, 578, 4, 2.5, -6, '#c7a878'],
+];
+
+const MAIN_ROAD = 'M 0 422 C 88 412, 208 404, 318 408 S 516 422, 676 416 S 896 406, 1072 410 S 1222 404, 1300 400';
+const PATH_PLAZA = 'M 96 416 C 110 474, 124 538, 146 604';
+const PATH_SCHOOL = 'M 482 414 C 478 340, 470 264, 476 184';
+const PATH_EAST = 'M 542 192 C 624 180, 712 170, 778 176';
+const PATH_ADVENTURE = 'M 778 176 C 858 172, 928 196, 966 254';
+const PATH_RIGHT = 'M 966 254 C 984 344, 994 424, 980 508';
+const PATH_LAKE = 'M 980 508 C 970 546, 956 572, 940 592';
+const PATH_SOUTH = 'M 318 408 C 310 480, 298 548, 292 618';
+
+// Alle Wege in einem Durchgang: erst die weiche Erdaura, dann die Wegfläche,
+// dann die unscharfe Aufhellung. Kein Mittelstreifen, keine Zebrastreifen.
+const PATHS: { d: string; w: number }[] = [
+  { d: MAIN_ROAD, w: 42 }, { d: PATH_PLAZA, w: 28 }, { d: PATH_SCHOOL, w: 30 },
+  { d: PATH_EAST, w: 26 }, { d: PATH_ADVENTURE, w: 24 }, { d: PATH_RIGHT, w: 24 },
+  { d: PATH_LAKE, w: 20 }, { d: PATH_SOUTH, w: 18 },
+];
+
+const MapTree = ({ x, y, s = 1 }: { x: number; y: number; s?: number }) => (
+  <g transform={`translate(${x},${y}) scale(${s})`}>
+    <ellipse cx="6" cy="24" rx="26" ry="8" fill="#4a7f38" opacity="0.35" filter="url(#fSoft)" />
+    <path d="M -4 24 L -4 4 q 4 -6 8 0 L 4 24 Z" fill="#8d5f3c" />
+    <circle cx="-9" cy="-2" r="17" fill="#3f8b45" />
+    <circle cx="10" cy="2" r="15" fill="#4f9c4c" />
+    <circle cx="0" cy="-14" r="16" fill="#61b357" />
+    <circle cx="-5" cy="-19" r="8" fill="#7fca6d" opacity="0.85" />
+  </g>
+);
+
 const MapTerrain = () => (
   <svg className="map-terrain" viewBox="0 0 1300 700" preserveAspectRatio="xMidYMid slice">
     <defs>
-      <radialGradient id="gGrass" cx="50%" cy="50%" r="80%">
-        <stop offset="0%" stopColor="#8fd466" />
-        <stop offset="100%" stopColor="#6ab84e" />
-      </radialGradient>
-      <radialGradient id="gLake" cx="35%" cy="35%" r="65%">
-        <stop offset="0%" stopColor="#74c5f7" />
-        <stop offset="100%" stopColor="#3a9fd0" />
-      </radialGradient>
-      <radialGradient id="gPlaza" cx="50%" cy="50%" r="70%">
-        <stop offset="0%" stopColor="#dcc48a" />
-        <stop offset="100%" stopColor="#c8a96e" />
-      </radialGradient>
-      <filter id="fBlur">
-        <feGaussianBlur stdDeviation="10" />
+      <linearGradient id="gGrass" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#a8d873" />
+        <stop offset="100%" stopColor="#7fbc55" />
+      </linearGradient>
+      <linearGradient id="gLake" x1="0.2" y1="0" x2="0.8" y2="1">
+        <stop offset="0%" stopColor="#9adcf2" />
+        <stop offset="100%" stopColor="#63b6dd" />
+      </linearGradient>
+      <filter id="fSoft" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="6" />
       </filter>
-      <filter id="fBlur4">
-        <feGaussianBlur stdDeviation="4" />
+      <filter id="fHaze" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="18" />
+      </filter>
+      <filter id="fEdge" x="-20%" y="-30%" width="140%" height="160%">
+        <feGaussianBlur stdDeviation="3.5" />
       </filter>
     </defs>
 
-    {/* Base grass */}
+    {/* Wiese: warme Grundfläche mit weichen Sonnenflecken */}
     <rect width="1300" height="700" fill="url(#gGrass)" />
+    <ellipse cx="330" cy="250" rx="300" ry="190" fill="#c6e58c" opacity="0.42" filter="url(#fHaze)" />
+    <ellipse cx="980" cy="470" rx="330" ry="210" fill="#c0e488" opacity="0.3" filter="url(#fHaze)" />
+    <ellipse cx="640" cy="640" rx="360" ry="140" fill="#6faa4b" opacity="0.28" filter="url(#fHaze)" />
 
-    {/* Zone tints — subtle colour differentiation per area */}
-    <ellipse cx="175" cy="480" rx="255" ry="220" fill="#b5e87a" opacity="0.28" filter="url(#fBlur)" />
-    <ellipse cx="540" cy="300" rx="285" ry="250" fill="#7ec8a0" opacity="0.22" filter="url(#fBlur)" />
-    <ellipse cx="990" cy="390" rx="295" ry="260" fill="#d0e870" opacity="0.18" filter="url(#fBlur)" />
+    {/* ── Wald oben links ── */}
+    <ellipse cx="86"  cy="150" rx="96" ry="80" fill="#3f8b45" />
+    <ellipse cx="150" cy="106" rx="72" ry="60" fill="#54a552" />
+    <ellipse cx="42"  cy="196" rx="58" ry="50" fill="#478f47" />
+    <ellipse cx="196" cy="156" rx="50" ry="44" fill="#63b45c" />
+    <ellipse cx="132" cy="88"  rx="40" ry="30" fill="#7cc76c" opacity="0.75" />
 
-    {/* ── Forest top-left ── */}
-    <ellipse cx="72"  cy="158" rx="108" ry="92"  fill="#3a8840" opacity="0.92" />
-    <ellipse cx="138" cy="132" rx="82"  ry="72"  fill="#47a84a" />
-    <ellipse cx="52"  cy="228" rx="66"  ry="58"  fill="#368838" opacity="0.9" />
-    <ellipse cx="185" cy="182" rx="56"  ry="50"  fill="#4caf50" opacity="0.82" />
-    <ellipse cx="108" cy="210" rx="44"  ry="40"  fill="#43a047" opacity="0.75" />
+    {/* ── Wald oben rechts ── */}
+    <ellipse cx="1246" cy="128" rx="86" ry="72" fill="#3f8b45" />
+    <ellipse cx="1188" cy="160" rx="60" ry="52" fill="#54a552" />
+    <ellipse cx="1276" cy="200" rx="50" ry="44" fill="#478f47" />
+    <ellipse cx="1240" cy="104" rx="40" ry="28" fill="#7cc76c" opacity="0.7" />
 
-    {/* ── Forest top-right ── */}
-    <ellipse cx="1248" cy="145" rx="96"  ry="82"  fill="#3a8840" opacity="0.9" />
-    <ellipse cx="1185" cy="180" rx="72"  ry="64"  fill="#47a84a" />
-    <ellipse cx="1268" cy="218" rx="60"  ry="54"  fill="#368838" opacity="0.88" />
-    <ellipse cx="1155" cy="148" rx="50"  ry="45"  fill="#4caf50" opacity="0.8" />
+    {/* ── Wäldchen in der Mitte ── */}
+    <ellipse cx="648" cy="498" rx="52" ry="44" fill="#4a9c4e" opacity="0.6" />
+    <ellipse cx="686" cy="472" rx="38" ry="34" fill="#5cb058" opacity="0.6" />
 
-    {/* ── Scattered forest mid ── */}
-    <ellipse cx="648" cy="498" rx="52" ry="44" fill="#4a9c4e" opacity="0.55" />
-    <ellipse cx="686" cy="472" rx="38" ry="34" fill="#4caf50" opacity="0.55" />
+    {/* ── See unten rechts ── */}
+    <ellipse cx="960" cy="598" rx="228" ry="128" fill="#4f9dc4" opacity="0.45" filter="url(#fSoft)" />
+    <ellipse cx="960" cy="598" rx="216" ry="118" fill="url(#gLake)" />
+    <ellipse cx="960" cy="598" rx="216" ry="118" fill="none" stroke="#e8f6fb" strokeWidth="4" opacity="0.55" />
+    <ellipse cx="912" cy="578" rx="58" ry="7" fill="white" opacity="0.5" transform="rotate(-9 912 578)" />
+    <ellipse cx="1016" cy="610" rx="40" ry="5" fill="white" opacity="0.45" transform="rotate(6 1016 610)" />
+    <ellipse cx="946" cy="630" rx="28" ry="4" fill="white" opacity="0.4" />
+    <g stroke="#4f8f3f" strokeWidth="4" strokeLinecap="round" fill="none">
+      <path d="M 758 560 q -6 -26 2 -40 M 768 564 q 2 -30 12 -42 M 778 562 q 8 -24 20 -34" />
+      <path d="M 1170 580 q 6 -26 -2 -40 M 1160 584 q -2 -30 -12 -42" />
+    </g>
 
-    {/* ── Lake bottom-right ── */}
-    <ellipse cx="960" cy="598" rx="218" ry="122" fill="#3a9fd0" />
-    <ellipse cx="960" cy="598" rx="198" ry="108" fill="url(#gLake)" />
-    <ellipse cx="912" cy="578" rx="62" ry="15" fill="white" opacity="0.17" transform="rotate(-12 912 578)" />
-    <ellipse cx="1008" cy="608" rx="44" ry="11" fill="white" opacity="0.13" transform="rotate(7 1008 608)" />
-    <ellipse cx="958" cy="622" rx="28" ry="7"  fill="white" opacity="0.1" />
+    {/* ── Dorfplatz ── */}
+    <ellipse cx="155" cy="614" rx="134" ry="90" fill="#e3caa0" />
+    <ellipse cx="155" cy="614" rx="134" ry="90" fill="none" stroke="#c7a778" strokeWidth="4" />
+    <g fill="#d3b489" opacity="0.85">
+      <ellipse cx="96"  cy="590" rx="15" ry="8" /><ellipse cx="140" cy="580" rx="13" ry="7" />
+      <ellipse cx="188" cy="592" rx="16" ry="8" /><ellipse cx="234" cy="608" rx="13" ry="7" />
+      <ellipse cx="112" cy="634" rx="16" ry="8" /><ellipse cx="166" cy="646" rx="14" ry="7" />
+      <ellipse cx="220" cy="638" rx="12" ry="6" /><ellipse cx="66"  cy="618" rx="13" ry="7" />
+    </g>
 
-    {/* ── Town plaza (cobblestone) ── */}
-    <ellipse cx="155" cy="614" rx="132" ry="88" fill="url(#gPlaza)" opacity="0.55" filter="url(#fBlur4)" />
-
-    {/* ── School yard ── */}
-    <rect x="298" y="72" width="392" height="322" rx="24" fill="#a8d5a2" opacity="0.3" filter="url(#fBlur4)" />
+    {/* ── Schulhof ── */}
+    <rect x="298" y="72" width="392" height="322" rx="24" fill="#b6dfa8" opacity="0.35" filter="url(#fSoft)" />
 
     {/* ================================================================
-        PATHS — dark edge + sand fill + dashed centre line
+        WEGE — getretener Pfad, keine Straße: weiche Erdaura statt harter
+        Kante, Kreuzungen als kleine Lichtung, im Inneren nur gestreute
+        Erdflecken. Jede durchgehende Längslinie sähe wieder nach Fahrbahn aus.
         ================================================================ */}
 
-    {/* Main east-west road */}
-    <path d="M 0 422 C 88 412, 208 404, 318 408 S 516 422, 676 416 S 896 406, 1072 410 S 1222 404, 1300 400"
-          stroke="#9e7a48" strokeWidth="42" fill="none" strokeLinecap="round" />
-    <path d="M 0 422 C 88 412, 208 404, 318 408 S 516 422, 676 416 S 896 406, 1072 410 S 1222 404, 1300 400"
-          stroke="#d4bc8a" strokeWidth="30" fill="none" strokeLinecap="round" />
-    <path d="M 0 422 C 88 412, 208 404, 318 408 S 516 422, 676 416 S 896 406, 1072 410 S 1222 404, 1300 400"
-          stroke="#f0e8be" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="22 16" opacity="0.85" />
+    {/* Kreuzungslichtungen, damit die Wege ineinander laufen statt sich zu schneiden */}
+    <g fill="#cfae7e" opacity="0.9" filter="url(#fEdge)">
+      <ellipse cx="482" cy="414" rx="46" ry="30" />
+      <ellipse cx="318" cy="408" rx="38" ry="26" />
+      <ellipse cx="96"  cy="418" rx="38" ry="26" />
+      <ellipse cx="778" cy="176" rx="32" ry="22" />
+      <ellipse cx="966" cy="254" rx="30" ry="22" />
+      <ellipse cx="542" cy="192" rx="30" ry="22" />
+    </g>
 
-    {/* Branch: left → town plaza */}
-    <path d="M 96 416 C 110 474, 124 538, 146 604"
-          stroke="#9e7a48" strokeWidth="28" fill="none" strokeLinecap="round" />
-    <path d="M 96 416 C 110 474, 124 538, 146 604"
-          stroke="#d4bc8a" strokeWidth="18" fill="none" strokeLinecap="round" />
-    <path d="M 96 416 C 110 474, 124 538, 146 604"
-          stroke="#f0e8be" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="18 14" opacity="0.8" />
+    {PATHS.map(p => (
+      <path key={`aura-${p.d}`} d={p.d} stroke="#cfae7e" strokeWidth={p.w + 16}
+            fill="none" strokeLinecap="round" filter="url(#fEdge)" opacity="0.9" />
+    ))}
+    {PATHS.map(p => (
+      <path key={`fill-${p.d}`} d={p.d} stroke="#e6d3a8" strokeWidth={p.w}
+            fill="none" strokeLinecap="round" />
+    ))}
+    {PATHS.map(p => (
+      <path key={`core-${p.d}`} d={p.d} stroke="#f2e4c2" strokeWidth={p.w * 0.5}
+            fill="none" strokeLinecap="round" opacity="0.45" filter="url(#fEdge)" />
+    ))}
 
-    {/* Branch: main road → school zone (vertical) */}
-    <path d="M 482 414 C 478 340, 470 264, 476 184"
-          stroke="#9e7a48" strokeWidth="30" fill="none" strokeLinecap="round" />
-    <path d="M 482 414 C 478 340, 470 264, 476 184"
-          stroke="#d4bc8a" strokeWidth="20" fill="none" strokeLinecap="round" />
-    <path d="M 482 414 C 478 340, 470 264, 476 184"
-          stroke="#f0e8be" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="18 14" opacity="0.8" />
+    {/* Großflächige, unscharfe Tonwertwechsel — heller und dunkler, ohne Kante */}
+    <g opacity="0.28" filter="url(#fEdge)">
+      <ellipse cx="180" cy="408" rx="30" ry="11" fill="#c7a878" />
+      <ellipse cx="520" cy="420" rx="34" ry="12" fill="#f4e8c8" />
+      <ellipse cx="880" cy="408" rx="32" ry="11" fill="#c7a878" />
+      <ellipse cx="1150" cy="406" rx="28" ry="10" fill="#f4e8c8" />
+      <ellipse cx="122" cy="500" rx="11" ry="24" fill="#c7a878" />
+      <ellipse cx="476" cy="300" rx="12" ry="26" fill="#f4e8c8" />
+      <ellipse cx="986" cy="390" rx="10" ry="22" fill="#c7a878" />
+    </g>
 
-    {/* Branch: school → east (division / adventure) */}
-    <path d="M 542 192 C 624 180, 712 170, 778 176"
-          stroke="#9e7a48" strokeWidth="26" fill="none" strokeLinecap="round" />
-    <path d="M 542 192 C 624 180, 712 170, 778 176"
-          stroke="#d4bc8a" strokeWidth="16" fill="none" strokeLinecap="round" />
-    <path d="M 542 192 C 624 180, 712 170, 778 176"
-          stroke="#f0e8be" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="18 14" opacity="0.8" />
+    {/* Erdflecken */}
+    {PATH_SPECKS.map(([x, y, rx, ry, rot, fill], i) => (
+      <ellipse key={`sp${i}`} cx={x} cy={y} rx={rx} ry={ry} fill={fill}
+               transform={`rotate(${rot} ${x} ${y})`} />
+    ))}
 
-    {/* Branch: east → adventure zone top */}
-    <path d="M 778 176 C 858 172, 928 196, 966 254"
-          stroke="#9e7a48" strokeWidth="24" fill="none" strokeLinecap="round" />
-    <path d="M 778 176 C 858 172, 928 196, 966 254"
-          stroke="#d4bc8a" strokeWidth="14" fill="none" strokeLinecap="round" />
-    <path d="M 778 176 C 858 172, 928 196, 966 254"
-          stroke="#f0e8be" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="16 12" opacity="0.8" />
+    {/* Grasbüschel über den Wegrändern */}
+    <g stroke="#6ba646" strokeWidth="3.5" strokeLinecap="round" fill="none">
+      {PATH_TUFTS.map(([x, y], i) => (
+        <path key={`tu${i}`} d={`M ${x} ${y} q 4 -12 8 -2 M ${x + 12} ${y + 2} q 5 -14 9 -3`} />
+      ))}
+    </g>
 
-    {/* Branch: down right side */}
-    <path d="M 966 254 C 984 344, 994 424, 980 508"
-          stroke="#9e7a48" strokeWidth="24" fill="none" strokeLinecap="round" />
-    <path d="M 966 254 C 984 344, 994 424, 980 508"
-          stroke="#d4bc8a" strokeWidth="14" fill="none" strokeLinecap="round" />
-    <path d="M 966 254 C 984 344, 994 424, 980 508"
-          stroke="#f0e8be" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="16 12" opacity="0.8" />
-
-    {/* Branch: to lake / Differenz-See */}
-    <path d="M 980 508 C 970 546, 956 572, 940 592"
-          stroke="#9e7a48" strokeWidth="20" fill="none" strokeLinecap="round" />
-    <path d="M 980 508 C 970 546, 956 572, 940 592"
-          stroke="#d4bc8a" strokeWidth="12" fill="none" strokeLinecap="round" />
-
-    {/* Small connector: side road south */}
-    <path d="M 318 408 C 310 480, 298 548, 292 618"
-          stroke="#9e7a48" strokeWidth="18" fill="none" strokeLinecap="round" opacity="0.7" />
-    <path d="M 318 408 C 310 480, 298 548, 292 618"
-          stroke="#d4bc8a" strokeWidth="10" fill="none" strokeLinecap="round" opacity="0.7" />
-
-    {/* Crosswalk marks at main junctions */}
-    <line x1="468" y1="396" x2="494" y2="396" stroke="white" strokeWidth="3.5" opacity="0.42" strokeLinecap="round" />
-    <line x1="468" y1="408" x2="494" y2="408" stroke="white" strokeWidth="3.5" opacity="0.42" strokeLinecap="round" />
-    <line x1="306" y1="397" x2="332" y2="397" stroke="white" strokeWidth="3.5" opacity="0.38" strokeLinecap="round" />
-    <line x1="306" y1="409" x2="332" y2="409" stroke="white" strokeWidth="3.5" opacity="0.38" strokeLinecap="round" />
-    <line x1="958" y1="398" x2="976" y2="398" stroke="white" strokeWidth="3" opacity="0.35" strokeLinecap="round" />
-    <line x1="958" y1="410" x2="976" y2="410" stroke="white" strokeWidth="3" opacity="0.35" strokeLinecap="round" />
-
-    {/* Dot path flavour on main road */}
-    {[0.1, 0.3, 0.5, 0.7, 0.9].map((t, i) => {
-      const x = t * 1300;
-      const y = 422 - Math.sin(t * Math.PI) * 12;
-      return <circle key={i} cx={x} cy={y} r="3" fill="#c4a060" opacity="0.4" />;
-    })}
+    {/* Bäume */}
+    {TREE_SPOTS.map((t, i) => <MapTree key={`tr${i}`} x={t.x} y={t.y} s={t.s} />)}
   </svg>
 );
 
@@ -277,40 +338,29 @@ const BUILDINGS: {
   icon: string;
   color: string;
   roofColor: string;
+  shape: HouseShape;
   left: string;
   top: string;
 }[] = [
   // Zone 1 – Rechendorf
-  { category: 'plus',                 label: 'Plus-Haus',      icon: '➕', color: '#ef5350', roofColor: '#b71c1c', left: '9%',  top: '60%' },
-  { category: 'minus',                label: 'Minus-Turm',     icon: '➖', color: '#42a5f5', roofColor: '#1565c0', left: '19%', top: '55%' },
-  { category: 'verdoppeln-halbieren', label: 'Spiegel-Haus',   icon: '🔄', color: '#66bb6a', roofColor: '#2e7d32', left: '13%', top: '79%' },
+  { category: 'plus',                 label: 'Plus-Haus',      icon: '➕', color: '#ef5350', roofColor: '#b71c1c', shape: 'cottage',  left: '9%',  top: '60%' },
+  { category: 'minus',                label: 'Minus-Turm',     icon: '➖', color: '#42a5f5', roofColor: '#1565c0', shape: 'tower',    left: '19%', top: '55%' },
+  { category: 'verdoppeln-halbieren', label: 'Spiegel-Haus',   icon: '🔄', color: '#66bb6a', roofColor: '#2e7d32', shape: 'barrel',   left: '13%', top: '79%' },
   // Zone 2 – Malviertel
-  { category: 'einmaleins-klein',     label: '1×1 (bis 5)',    icon: '✖️', color: '#ab47bc', roofColor: '#6a1b9a', left: '37%', top: '25%' },
-  { category: 'einmaleins-gross',     label: '1×1 (bis 10)',   icon: '✖️', color: '#7b1fa2', roofColor: '#4a148c', left: '48%', top: '17%' },
-  { category: 'einmaleins-tafel',     label: '1×1 Tafel',      icon: '📋', color: '#e91e63', roofColor: '#880e4f', left: '43%', top: '41%' },
-  { category: 'division',             label: 'Divisions-Haus', icon: '➗', color: '#1e88e5', roofColor: '#0d47a1', left: '58%', top: '22%' },
-  { category: 'division-zerlegen',    label: 'Zerlege-Werkstatt', icon: '🧩', color: '#00897b', roofColor: '#004d40', left: '64%', top: '38%' },
-  { category: 'kernaufgaben',         label: 'Kern-Trainer',   icon: '🔑', color: '#fb8c00', roofColor: '#e65100', left: '55%', top: '51%' },
-  { category: 'tausch-arena',         label: 'Tausch-Arena',   icon: '🏡', color: '#43a047', roofColor: '#1b5e20', left: '45%', top: '62%' },
+  { category: 'einmaleins-klein',     label: '1×1 (bis 5)',    icon: '✖️', color: '#ab47bc', roofColor: '#6a1b9a', shape: 'cottage',  left: '37%', top: '25%' },
+  { category: 'einmaleins-gross',     label: '1×1 (bis 10)',   icon: '✖️', color: '#7b1fa2', roofColor: '#4a148c', shape: 'twostory', left: '48%', top: '17%' },
+  { category: 'einmaleins-tafel',     label: '1×1 Tafel',      icon: '📋', color: '#e91e63', roofColor: '#880e4f', shape: 'workshop', left: '43%', top: '41%' },
+  { category: 'division',             label: 'Divisions-Haus', icon: '➗', color: '#1e88e5', roofColor: '#0d47a1', shape: 'twostory', left: '58%', top: '22%' },
+  { category: 'division-zerlegen',    label: 'Zerlege-Werkstatt', icon: '🧩', color: '#00897b', roofColor: '#004d40', shape: 'workshop', left: '64%', top: '38%' },
+  { category: 'kernaufgaben',         label: 'Kern-Trainer',   icon: '🔑', color: '#fb8c00', roofColor: '#e65100', shape: 'cottage',  left: '55%', top: '51%' },
+  { category: 'tausch-arena',         label: 'Tausch-Arena',   icon: '🏡', color: '#43a047', roofColor: '#1b5e20', shape: 'barrel',   left: '45%', top: '62%' },
   // Zone 3 – Abenteuerviertel
-  { category: 'sachaufgaben',         label: 'Rechen-Post',    icon: '✉️', color: '#f4511e', roofColor: '#bf360c', left: '70%', top: '17%' },
-  { category: 'platzhalter',          label: 'Rätsel-Höhle',   icon: '🔍', color: '#8d6e63', roofColor: '#4e342e', left: '80%', top: '37%' },
-  { category: 'zahlen-fabrik',        label: 'Zahlen-Fabrik',  icon: '⚙️', color: '#546e7a', roofColor: '#263238', left: '74%', top: '57%' },
-  { category: 'meister-zelt',         label: 'Meister-Zelt',   icon: '🏆', color: '#ffca28', roofColor: '#f57f17', left: '84%', top: '67%' },
-  { category: 'differenz-jagd',       label: 'Differenz-See',  icon: '🌊', color: '#29b6f6', roofColor: '#01579b', left: '69%', top: '80%' },
-  { category: 'zahlen-mauer',         label: 'Zahlen-Mauer',   icon: '🧱', color: '#a1887f', roofColor: '#4e342e', left: '83%', top: '81%' },
-];
-
-const TREES: { left: string; top: string; big?: boolean }[] = [
-  { left: '3%',  top: '8%',  big: true }, { left: '7%',  top: '5%' },  { left: '4%',  top: '18%' },
-  { left: '11%', top: '11%', big: true }, { left: '15%', top: '7%' },  { left: '8%',  top: '25%', big: true },
-  { left: '89%', top: '6%',  big: true }, { left: '94%', top: '9%' },  { left: '91%', top: '18%' },
-  { left: '97%', top: '14%', big: true }, { left: '86%', top: '13%' },
-  { left: '25%', top: '6%' }, { left: '29%', top: '9%', big: true },   { left: '27%', top: '14%' },
-  { left: '63%', top: '68%', big: true }, { left: '66%', top: '64%' },
-  { left: '50%', top: '78%' }, { left: '56%', top: '74%', big: true },
-  { left: '32%', top: '86%' }, { left: '36%', top: '90%' },
-  { left: '2%',  top: '50%' }, { left: '98%', top: '48%' },
+  { category: 'sachaufgaben',         label: 'Rechen-Post',    icon: '✉️', color: '#f4511e', roofColor: '#bf360c', shape: 'cottage',  left: '70%', top: '17%' },
+  { category: 'platzhalter',          label: 'Rätsel-Höhle',   icon: '🔍', color: '#8d6e63', roofColor: '#4e342e', shape: 'tower',    left: '80%', top: '37%' },
+  { category: 'zahlen-fabrik',        label: 'Zahlen-Fabrik',  icon: '⚙️', color: '#546e7a', roofColor: '#263238', shape: 'workshop', left: '74%', top: '57%' },
+  { category: 'meister-zelt',         label: 'Meister-Zelt',   icon: '🏆', color: '#ffca28', roofColor: '#f57f17', shape: 'tent',     left: '84%', top: '67%' },
+  { category: 'differenz-jagd',       label: 'Differenz-See',  icon: '🌊', color: '#29b6f6', roofColor: '#01579b', shape: 'barrel',   left: '69%', top: '80%' },
+  { category: 'zahlen-mauer',         label: 'Zahlen-Mauer',   icon: '🧱', color: '#a1887f', roofColor: '#4e342e', shape: 'twostory', left: '83%', top: '81%' },
 ];
 
 const ZONE_SIGNS = [
@@ -319,24 +369,146 @@ const ZONE_SIGNS = [
   { label: '🎮 Abenteuerviertel', left: '73%', top: '7%'  },
 ];
 
+// ── Gezeichnete Häuser ──
+// Alle Bauformen teilen sich das Innere (Schild mit Zeichen, Tür, Fenster);
+// unterschieden werden sie über die Silhouette — das ist es, was auf
+// Kartengröße überhaupt erkennbar bleibt.
+
+const WOOD = '#8d5a3b';
+const WOOD_FACE = '#c99a63';
+const GLASS = '#ffe9a8';
+
+// Schild mit dem Zeichen der Aufgabenart — ersetzt das direkt auf die Wand
+// geklebte Emoji, bleibt aber als Erkennungsmerkmal für Leseanfänger erhalten.
+const HouseSign = ({ icon, y = 72, w = 32, h = 24 }: { icon: string; y?: number; w?: number; h?: number }) => (
+  <g>
+    <rect x={60 - w / 2} y={y} width={w} height={h} rx="3" fill={WOOD} />
+    <rect x={60 - w / 2 + 2.5} y={y + 2.5} width={w - 5} height={h - 5} rx="2" fill={WOOD_FACE} />
+    <text x="60" y={y + h / 2 + h * 0.3} textAnchor="middle" fontSize={h * 0.8}>{icon}</text>
+  </g>
+);
+
+const HouseDoor = ({ x = 52, y = 102, w = 16, h = 24 }: { x?: number; y?: number; w?: number; h?: number }) => (
+  <g>
+    <path d={`M ${x} ${y + h} L ${x} ${y + 7} q 0 -7 ${w / 2} -7 q ${w / 2} 0 ${w / 2} 7 L ${x + w} ${y + h} Z`} fill={WOOD} />
+    <circle cx={x + w - 4} cy={y + h * 0.55} r="1.8" fill="#ffd77a" />
+  </g>
+);
+
+const HouseWindow = ({ x, y, w = 14, h = 14 }: { x: number; y: number; w?: number; h?: number }) => (
+  <g>
+    <rect x={x} y={y} width={w} height={h} rx="2.5" fill={GLASS} stroke={WOOD} strokeWidth="2.5" />
+    <path d={`M ${x + w / 2} ${y} L ${x + w / 2} ${y + h} M ${x} ${y + h / 2} L ${x + w} ${y + h / 2}`} stroke={WOOD} strokeWidth="1.8" />
+  </g>
+);
+
+type HouseShape = 'cottage' | 'tower' | 'twostory' | 'workshop' | 'barrel' | 'tent';
+
+const HouseArt = ({ shape, color, roofColor, icon }: { shape: HouseShape; color: string; roofColor: string; icon: string }) => (
+  <svg className="mb-svg" viewBox="0 0 120 140" preserveAspectRatio="xMidYMax meet">
+    <ellipse cx="63" cy="126" rx="44" ry="8" fill="#4a7f38" opacity="0.3" />
+
+    {shape === 'tent' ? (
+      <>
+        <path d="M 60 18 L 112 126 L 8 126 Z" fill={color} />
+        <path d="M 60 18 L 60 126 L 8 126 Z" fill="#fff" opacity="0.13" />
+        <path d="M 60 18 L 78 126 L 62 126 Z" fill={roofColor} opacity="0.55" />
+        <path d="M 60 18 L 42 126 L 58 126 Z" fill={roofColor} opacity="0.35" />
+        <path d="M 60 12 L 60 22" stroke={WOOD} strokeWidth="3.5" strokeLinecap="round" />
+        <path d="M 62 12 L 84 18 L 62 24 Z" fill="#ffca28" />
+        <path d="M 48 126 L 54 96 q 6 -8 12 0 L 72 126 Z" fill="#4a2f1e" />
+        <HouseSign icon={icon} y={60} w={30} h={24} />
+      </>
+    ) : shape === 'tower' ? (
+      <>
+        <path d="M 36 126 L 36 52 q 0 -5 5 -5 L 79 47 q 5 0 5 5 L 84 126 Z" fill={color} />
+        <path d="M 68 48 L 84 52 L 84 126 L 68 126 Z" fill="#000" opacity="0.13" />
+        <rect x="33" y="40" width="54" height="10" rx="4" fill={roofColor} opacity="0.75" />
+        <path d="M 28 42 L 60 16 L 92 42 Z" fill={roofColor} />
+        <path d="M 28 42 L 60 16 L 60 42 Z" fill="#fff" opacity="0.13" />
+        <path d="M 60 16 L 60 4" stroke={WOOD} strokeWidth="3" strokeLinecap="round" />
+        <path d="M 62 5 L 84 10 L 62 15 Z" fill="#ffca28" />
+        <HouseSign icon={icon} y={60} w={28} h={22} />
+        <circle cx="60" cy="94" r="6.5" fill={GLASS} stroke={WOOD} strokeWidth="2.5" />
+        <HouseDoor x={53} y={104} w={14} h={22} />
+      </>
+    ) : shape === 'twostory' ? (
+      <>
+        <path d="M 22 126 L 22 62 q 0 -6 6 -6 L 92 56 q 6 0 6 6 L 98 126 Z" fill={color} />
+        <path d="M 80 58 L 98 62 L 98 126 L 80 126 Z" fill="#000" opacity="0.12" />
+        <path d="M 10 64 L 60 18 L 110 64 q 3 4 -3 4 L 13 68 q -6 0 -3 -4 Z" fill={roofColor} />
+        <path d="M 10 64 L 60 18 L 60 68 L 13 68 q -6 0 -3 -4 Z" fill="#fff" opacity="0.12" />
+        <g stroke="#000" strokeWidth="2" opacity="0.16" strokeLinecap="round">
+          <path d="M 20 60 L 100 60" /><path d="M 32 48 L 88 48" />
+        </g>
+        <rect x="22" y="94" width="76" height="3" fill="#000" opacity="0.12" />
+        <HouseWindow x={30} y={72} w={13} h={13} />
+        <HouseWindow x={77} y={72} w={13} h={13} />
+        <HouseSign icon={icon} y={99} w={30} h={22} />
+        <HouseDoor x={26} y={104} w={14} h={22} />
+      </>
+    ) : shape === 'workshop' ? (
+      <>
+        <rect x="24" y="26" width="13" height="28" rx="3" fill={roofColor} />
+        <rect x="21" y="22" width="19" height="9" rx="4" fill={roofColor} opacity="0.8" />
+        <path d="M 24 126 L 24 78 L 96 66 L 96 126 Z" fill={color} />
+        <path d="M 80 68 L 96 66 L 96 126 L 80 126 Z" fill="#000" opacity="0.12" />
+        <path d="M 12 78 L 108 62 L 108 74 L 12 90 Z" fill={roofColor} />
+        <path d="M 12 78 L 108 62 L 108 67 L 12 83 Z" fill="#fff" opacity="0.12" />
+        <HouseSign icon={icon} y={92} w={30} h={22} />
+        <HouseWindow x={28} y={94} w={13} h={13} />
+        <HouseWindow x={80} y={90} w={13} h={13} />
+        <HouseDoor x={52} y={116} w={16} h={10} />
+      </>
+    ) : shape === 'barrel' ? (
+      <>
+        <path d="M 26 126 L 26 74 q 0 -6 6 -6 L 88 68 q 6 0 6 6 L 94 126 Z" fill={color} />
+        <path d="M 76 70 L 94 74 L 94 126 L 76 126 Z" fill="#000" opacity="0.12" />
+        <path d="M 14 72 q 46 -50 92 0 q 2 4 -4 4 L 18 76 q -6 0 -4 -4 Z" fill={roofColor} />
+        <path d="M 14 72 q 23 -25 46 -30 L 60 76 L 18 76 q -6 0 -4 -4 Z" fill="#fff" opacity="0.13" />
+        <HouseWindow x={30} y={82} w={13} h={13} />
+        <HouseWindow x={77} y={82} w={13} h={13} />
+        <HouseSign icon={icon} y={78} w={28} h={22} />
+        <HouseDoor x={52} y={104} w={16} h={22} />
+      </>
+    ) : (
+      <>
+        <rect x="74" y="24" width="13" height="28" rx="3" fill={roofColor} />
+        <rect x="71" y="20" width="19" height="9" rx="4" fill={roofColor} opacity="0.8" />
+        <g fill="#fff" opacity="0.55">
+          <circle cx="90" cy="14" r="5" /><circle cx="99" cy="6" r="5" />
+        </g>
+        <path d="M 24 126 L 24 74 q 0 -6 6 -6 L 90 68 q 6 0 6 6 L 96 126 Z" fill={color} />
+        <path d="M 78 70 L 96 74 L 96 126 L 78 126 Z" fill="#000" opacity="0.12" />
+        <path d="M 12 70 L 60 30 L 108 70 q 3 4 -3 4 L 15 74 q -6 0 -3 -4 Z" fill={roofColor} />
+        <path d="M 12 70 L 60 30 L 60 74 L 15 74 q -6 0 -3 -4 Z" fill="#fff" opacity="0.12" />
+        <g stroke="#000" strokeWidth="2" opacity="0.18" strokeLinecap="round">
+          <path d="M 22 66 L 98 66" /><path d="M 34 54 L 86 54" /><path d="M 46 42 L 74 42" />
+        </g>
+        <HouseWindow x={29} y={80} w={13} h={13} />
+        <HouseWindow x={78} y={80} w={13} h={13} />
+        <HouseSign icon={icon} y={76} w={28} h={22} />
+        <HouseDoor x={52} y={102} w={16} h={24} />
+      </>
+    )}
+  </svg>
+);
+
 interface MapBuildingProps {
-  label: string; icon: string; color: string; roofColor: string;
+  label: string; icon: string; color: string; roofColor: string; shape: HouseShape;
   stickers: string[]; left: string; top: string; onClick: () => void;
 }
 
-const MapBuilding = ({ label, icon, color, roofColor, stickers, left, top, onClick }: MapBuildingProps) => (
+const MapBuilding = ({ label, icon, color, roofColor, shape, stickers, left, top, onClick }: MapBuildingProps) => (
   <div className="map-building" style={{ left, top }} onClick={onClick}>
-    <div style={{ position: 'relative' }}>
+    <div className="mb-art">
       {stickers.length > 0 && (
         <div className="mb-badge">
           <Star size={9} fill="#f59e0b" stroke="none" />
           {stickers.length}
         </div>
       )}
-      <div className="mb-roof" style={{ borderBottomColor: roofColor }} />
-      <div className="mb-body" style={{ background: color }}>
-        <span className="mb-icon">{icon}</span>
-      </div>
+      <HouseArt shape={shape} color={color} roofColor={roofColor} icon={icon} />
     </div>
     <div className="mb-label">{label}</div>
   </div>
@@ -990,11 +1162,6 @@ export default function App() {
       <div className="map-viewport">
         <MapTerrain />
 
-        {/* CSS trees */}
-        {TREES.map((t, i) => (
-          <div key={i} className={`map-tree${t.big ? ' big' : ''}`} style={{ left: t.left, top: t.top }} />
-        ))}
-
         {/* zone signs */}
         {ZONE_SIGNS.map(z => (
           <div key={z.label} className="map-zone-sign" style={{ left: z.left, top: z.top }}>
@@ -1010,6 +1177,7 @@ export default function App() {
             icon={b.icon}
             color={b.color}
             roofColor={b.roofColor}
+            shape={b.shape}
             stickers={state.stickers[b.category] || []}
             left={b.left}
             top={b.top}

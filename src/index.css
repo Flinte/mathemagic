@@ -12,7 +12,7 @@
 
 body {
   margin: 0;
-  font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif;
+  font-family: 'Fredoka', 'Trebuchet MS', 'Comic Sans MS', system-ui, sans-serif;
   background: var(--bg-sky);
   color: var(--color-text);
   overflow-x: hidden;
@@ -841,30 +841,8 @@ body {
 }
 
 /* ── CSS Trees ── */
-.map-tree {
-  position: absolute;
-  width: 1.54cqw;
-  height: 1.54cqw;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 32%, #72c472, #2a7a2e);
-  box-shadow: 0 0.23cqw 0.46cqw rgba(0,0,0,0.28);
-  z-index: 6;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-}
-.map-tree::after {
-  content: '';
-  position: absolute;
-  bottom: -0.54cqw;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0.38cqw;
-  height: 0.54cqw;
-  background: #5d4037;
-  border-radius: 0 0 0.15cqw 0.15cqw;
-}
-.map-tree.big { width: 2.15cqw; height: 2.15cqw; }
-.map-tree.big::after { width: 0.46cqw; height: 0.69cqw; bottom: -0.69cqw; }
+/* Bäume werden inzwischen im Gelände-SVG gezeichnet (MapTree in App.tsx) —
+   als CSS-Kreis ließen sich Krone, Stamm und Bodenschatten nicht darstellen. */
 
 /* ── Map Buildings ── */
 .map-building {
@@ -884,38 +862,31 @@ body {
   filter: drop-shadow(0 10px 16px rgba(0,0,0,0.5));
   z-index: 30;
 }
-.mb-roof {
-  width: 0; height: 0;
-  border-left: 2.23cqw solid transparent;
-  border-right: 2.23cqw solid transparent;
-  border-bottom: 1.62cqw solid #5d4037;
-}
-.mb-body {
-  width: 4cqw;
-  height: 3.38cqw;
-  border-radius: 0.23cqw 0.23cqw 0.38cqw 0.38cqw;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: max(11px, 1.66cqw);
-  box-shadow: 0 0.31cqw 0 rgba(0,0,0,0.28), inset -0.31cqw 0 0.46cqw rgba(0,0,0,0.14);
-  border: 0.15cqw solid rgba(255,255,255,0.3);
+/* Das gezeichnete Haus skaliert als Ganzes über seine Breite — dadurch
+   bleiben Fenster, Tür und Schild automatisch im richtigen Verhältnis. */
+.mb-art {
   position: relative;
+  line-height: 0;
 }
-.mb-icon {
-  line-height: 1;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+.mb-svg {
+  display: block;
+  width: max(52px, 8.2cqw);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 0.15cqw 0.3cqw rgba(0,0,0,0.22));
 }
 .mb-label {
-  background: rgba(255,255,255,0.95);
-  border-radius: 0.38cqw;
-  padding: 0.15cqw 0.54cqw;
-  font-size: max(9px, 0.74cqw);
+  background: #fff6e4;
+  border: max(1.5px, 0.16cqw) solid #c9a06a;
+  color: #5b4636;
+  border-radius: 999px;
+  padding: 0.15cqw 0.6cqw;
+  font-size: max(9px, 0.78cqw);
   font-weight: bold;
   white-space: nowrap;
-  box-shadow: 0 0.15cqw 0.38cqw rgba(0,0,0,0.2);
-  margin-top: 0.23cqw;
-  max-width: 8cqw;
+  box-shadow: 0 0.15cqw 0.38cqw rgba(0,0,0,0.18);
+  margin-top: 0.3cqw;
+  max-width: 9cqw;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
