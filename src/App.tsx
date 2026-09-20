@@ -42,6 +42,20 @@ const drawFresh = <T,>(bucket: string, memory: number, roll: () => T, idOf: (t: 
   return out;
 };
 
+// --- Fokus ---
+// Jedes Eingabefeld ist aktiv, sobald es erscheint — ohne Klick lostippen.
+// `autoFocus` allein reicht dafuer nicht: es greift nur beim Einhaengen ins DOM,
+// und die meisten Haeuser tauschen zwischen zwei Aufgaben nur den Inhalt
+// desselben Feldes aus. `setTimeout(..., 0)` ist ebenfalls unzuverlaessig — zu
+// dem Zeitpunkt kann das Feld noch gar nicht im DOM stehen.
+//
+// `ref` darf je nach Zustand ein anderes Feld sein; deps steuern, wann neu
+// fokussiert wird. focus() auf ein bereits aktives Feld ist folgenlos.
+const useAutoFocus = (
+  ref: { current: HTMLInputElement | null },
+  deps: React.DependencyList,
+) => useEffect(() => { ref.current?.focus(); }, deps);
+
 // --- Sound Engine ---
 // Ein einziger AudioContext für die ganze App — Browser erlauben nur eine Handvoll
 // gleichzeitig, und jeder neue kostet spürbar Zeit beim Anlegen.
@@ -79,7 +93,7 @@ type Category =
   | 'plus' | 'minus' | 'verdoppeln-halbieren'
   | 'einmaleins-klein' | 'einmaleins-gross' | 'einmaleins-tafel'
   | 'division' | 'division-zerlegen' | 'division-rest' | 'tausch-arena' | 'kernaufgaben'
-  | 'sachaufgaben' | 'platzhalter' | 'punkt-vor-strich'
+  | 'sachaufgaben' | 'platzhalter' | 'punkt-vor-strich' | 'uhrzeit'
   | 'zahlen-fabrik' | 'meister-zelt' | 'differenz-jagd' | 'zahlen-mauer';
 
 const STICKERS = ['⭐', '🌟', '🦄', '🚀', '🎨', '🍕', '🐱', '🐶', '🌈', '🍦', '🍩', '🦁', '🦉', '💎', '🍭', '⚙️', '🏆', '🎈', '🏰'];
@@ -112,7 +126,7 @@ const DEFAULT_STICKERS: Record<Category, string[]> = {
   plus: [], minus: [], 'verdoppeln-halbieren': [],
   'einmaleins-klein': [], 'einmaleins-gross': [], 'einmaleins-tafel': [],
   division: [], 'division-zerlegen': [], 'division-rest': [], 'tausch-arena': [], kernaufgaben: [],
-  sachaufgaben: [], platzhalter: [], 'punkt-vor-strich': [],
+  sachaufgaben: [], platzhalter: [], 'punkt-vor-strich': [], uhrzeit: [],
   'zahlen-fabrik': [], 'meister-zelt': [], 'differenz-jagd': [], 'zahlen-mauer': [],
 };
 
@@ -499,6 +513,7 @@ const BUILDINGS: {
   { category: 'platzhalter',          label: 'Rätsel-Höhle',   icon: '🔍', color: '#8d6e63', roofColor: '#4e342e', shape: 'tower',    left: '80%', top: '37%' },
   { category: 'punkt-vor-strich',    label: 'Vorfahrt-Haus',  icon: '🚦', color: '#3949ab', roofColor: '#1a237e', shape: 'twostory', left: '88%', top: '48%' },
   { category: 'zahlen-fabrik',        label: 'Zahlen-Fabrik',  icon: '⚙️', color: '#546e7a', roofColor: '#263238', shape: 'workshop', left: '74%', top: '57%' },
+  { category: 'uhrzeit',             label: 'Uhren-Turm',     icon: '⏰', color: '#6d4c41', roofColor: '#3e2723', shape: 'tower',    left: '27%', top: '38%' },
   { category: 'meister-zelt',         label: 'Meister-Zelt',   icon: '🏆', color: '#ffca28', roofColor: '#f57f17', shape: 'tent',     left: '84%', top: '67%' },
   { category: 'differenz-jagd',       label: 'Differenz-See',  icon: '🌊', color: '#29b6f6', roofColor: '#01579b', shape: 'barrel',   left: '69%', top: '80%' },
   { category: 'zahlen-mauer',         label: 'Zahlen-Mauer',   icon: '🧱', color: '#a1887f', roofColor: '#4e342e', shape: 'twostory', left: '83%', top: '81%' },
@@ -688,6 +703,13 @@ const NumberWall = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () 
   const [wall, setWall] = useState<number[] | null>(null);
   const [inputs, setInputs] = useState<Record<number, string>>({});
   const [solvedCount, setSolvedCount] = useState(0);
+  // Die Mauer hat mehrere offene Steine — gesteuert wird ueber den Index, nicht
+  // ueber eine feste Ref. Der Fokus wandert nur bei neuer Mauer und nach einem
+  // richtigen Stein weiter, sonst wuerde er einem angeklickten Stein
+  // hinterherspringen.
+  const brickRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const [focusIdx, setFocusIdx] = useState<number | null>(null);
+  useEffect(() => { if (focusIdx !== null) brickRefs.current[focusIdx]?.focus(); }, [focusIdx, wall]);
 
   const generateWall = () => {
     const b1 = randInt(1, 10);
@@ -714,6 +736,7 @@ const NumberWall = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () 
     do { hidden = shuffle([0, 1, 2, 3, 4, 5]).slice(0, 3); } while (!isSolvable(hidden));
     setWall(fullWall);
     setInputs(hidden.reduce((acc, idx) => ({ ...acc, [idx]: '' }), {}));
+    setFocusIdx(Math.min(...hidden));
   };
 
   useEffect(() => generateWall(), []);
@@ -723,13 +746,14 @@ const NumberWall = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () 
     setInputs(newInputs);
     if (parseInt(val) === wall![idx]) {
       playSound('correct');
-      if (Object.keys(newInputs).every(k => parseInt(newInputs[+k]) === wall![+k])) {
+      const offen = Object.keys(newInputs).map(Number).filter(k => parseInt(newInputs[k]) !== wall![k]);
+      if (offen.length === 0) {
         setTimeout(() => {
           setSolvedCount(c => c + 1);
           if (solvedCount + 1 >= 3) onWin('🏰');
           else generateWall();
         }, 800);
-      }
+      } else setFocusIdx(Math.min(...offen));
     }
   };
 
@@ -742,16 +766,16 @@ const NumberWall = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () 
         <div style={{ marginBottom: '20px', fontWeight: 'bold' }}>Zwei Steine unten ergeben den Stein darüber! 🧱</div>
         <div className="wall-grid">
           <div className="wall-row">
-            <div className="brick">{inputs[0] !== undefined ? <input type="number" value={inputs[0]} onChange={e => check(0, e.target.value)} className="brick-input" /> : wall[0]}</div>
+            <div className="brick">{inputs[0] !== undefined ? <input ref={el => { brickRefs.current[0] = el; }} type="number" value={inputs[0]} onChange={e => check(0, e.target.value)} className="brick-input" /> : wall[0]}</div>
           </div>
           <div className="wall-row" style={{ position: 'relative' }}>
             <div style={{ position: 'absolute', top: '-15px' }}>➕</div>
-            {[1, 2].map(i => <div key={i} className="brick">{inputs[i] !== undefined ? <input type="number" value={inputs[i]} onChange={e => check(i, e.target.value)} className="brick-input" /> : wall[i]}</div>)}
+            {[1, 2].map(i => <div key={i} className="brick">{inputs[i] !== undefined ? <input ref={el => { brickRefs.current[i] = el; }} type="number" value={inputs[i]} onChange={e => check(i, e.target.value)} className="brick-input" /> : wall[i]}</div>)}
           </div>
           <div className="wall-row" style={{ position: 'relative' }}>
             <div style={{ position: 'absolute', top: '-15px', left: '25%' }}>➕</div>
             <div style={{ position: 'absolute', top: '-15px', right: '25%' }}>➕</div>
-            {[3, 4, 5].map(i => <div key={i} className="brick">{inputs[i] !== undefined ? <input type="number" value={inputs[i]} onChange={e => check(i, e.target.value)} className="brick-input" /> : wall[i]}</div>)}
+            {[3, 4, 5].map(i => <div key={i} className="brick">{inputs[i] !== undefined ? <input ref={el => { brickRefs.current[i] = el; }} type="number" value={inputs[i]} onChange={e => check(i, e.target.value)} className="brick-input" /> : wall[i]}</div>)}
           </div>
         </div>
       </div>
@@ -877,6 +901,8 @@ const MultiplicationTafel = ({ grid, onWin, onBack, onMarkCell }: { grid: Record
   const [solved, setSolved] = useState(0);
   const [input, setInput] = useState('');
   const [problem, setProblem] = useState<{ a: number; b: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useAutoFocus(inputRef, [problem]);
   const nextProblem = (g: Record<string, boolean>) => { const av: { a: number; b: number }[] = []; for (let a = 1; a <= 10; a++) for (let b = 1; b <= 10; b++) if (!g[`${a}x${b}`]) av.push({ a, b }); return av.length > 0 ? av[Math.floor(Math.random() * av.length)] : null; };
   useEffect(() => setProblem(nextProblem(grid)), []);
   const check = (val: string) => {
@@ -904,7 +930,7 @@ const MultiplicationTafel = ({ grid, onWin, onBack, onMarkCell }: { grid: Record
         <div className="game-container tafel-side">
           <h2>Fülle die Tafel! 🎨</h2>
           <div className="task" style={{ fontSize: '4rem' }}>{problem ? `${problem.a} × ${problem.b} = ?` : 'Fertig! 🎉'}</div>
-          <input autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} />
+          <input ref={inputRef} autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} />
           <StarProgress solved={solved} total={5} />
         </div>
       </div>
@@ -918,6 +944,8 @@ const TauschArena = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: ()
   const [input, setInput] = useState('');
   const [done, setDone] = useState<number[]>([]);
   const [completed, setCompleted] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useAutoFocus(inputRef, [family, step]);
   const genFamily = () => {
     // 4 x 7 und 7 x 4 sind dieselbe Aufgaben-Familie — deshalb wird die Sperre
     // ueber das sortierte Paar gefuehrt und nicht ueber a und b einzeln.
@@ -962,7 +990,7 @@ const TauschArena = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: ()
             </div>
           ))}
         </div>
-        <input autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} style={{ marginTop: '1.5rem' }} />
+        <input ref={inputRef} autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} style={{ marginTop: '1.5rem' }} />
         <StarProgress solved={completed} total={3} />
       </div>
     </div>
@@ -976,6 +1004,8 @@ const DivisionGame = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: (
   const [input, setInput] = useState('');
   const [divSolved, setDivSolved] = useState(false);
   const [completed, setCompleted] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useAutoFocus(inputRef, [fam, step]);
 
   const gen = () => {
     // Die Sperre ignoriert den Aufgabentyp: 63 : 7 zweimal hintereinander bleibt
@@ -1043,6 +1073,7 @@ const DivisionGame = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: (
         </div>
 
         <input
+          ref={inputRef}
           key={step}       /* remount → autoFocus beim Step-Wechsel */
           autoFocus
           className="input-field"
@@ -1105,6 +1136,8 @@ const ZerlegeDivision = ({ onWin, onBack }: { onWin: (s: string) => void; onBack
     setTimeout(() => ref0.current?.focus(), 0);
   };
   useEffect(() => gen(), []);
+  // Nach dem ersten richtigen Teil wandert der Fokus in die zweite Zeile.
+  useAutoFocus(done[0] && !done[1] ? ref1 : ref0, [task, done[0], done[1]]);
   if (!task) return null;
 
   const { n, d, p1, p2 } = task;
@@ -1245,6 +1278,12 @@ const RestHaus = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () =>
       window.setTimeout(() => setRevealed(i + 1), 380 * (i + 1)));
     return () => ids.forEach(clearTimeout);
   }, [showing, task]);
+
+  useAutoFocus(done[0] && !done[1] ? ref1 : ref0, [task, done[0], done[1]]);
+
+  // Sobald das Bild kommt, Tastatur zumachen — auf dem Handy verdeckt sie sonst
+  // genau die Kaestchen, um die es geht.
+  useEffect(() => { if (showing) (document.activeElement as HTMLElement | null)?.blur(); }, [showing]);
 
   if (!task) return null;
   const { n, d, q, r } = task;
@@ -1416,6 +1455,8 @@ const PunktVorStrich = ({ onWin, onBack }: { onWin: (s: string) => void; onBack:
     advancing.current = false;
   };
   useEffect(() => { gen(); }, []);
+  // Schritt 0 ist ein Antippen, da gibt es kein Feld — die Ref ist dann leer.
+  useAutoFocus(step === 2 ? ref2 : ref1, [task, step]);
   if (!task) return null;
 
   const { tokens, opIdx, v, result } = task;
@@ -1529,10 +1570,268 @@ const PunktVorStrich = ({ onWin, onBack }: { onWin: (s: string) => void; onBack:
   );
 };
 
+// ── Uhren-Turm: Ablesen, Einstellen, Zeitspannen ──
+// Drei Aufgabentypen im Wechsel, weil der Zettel alle drei verlangt. Die Uhr ist
+// gezeichnet und nicht digital: das Ablesen der Zeiger IST der Lernstoff.
+
+const ClockFace = ({ h, m, size = 150 }: { h: number; m: number; size?: number }) => {
+  // Der Stundenzeiger wandert mit den Minuten mit — eine Uhr, die um 3:30 noch
+  // exakt auf der 3 steht, gibt es nicht, und genau diese Zwischenstellung ist
+  // der Grund, warum "halb 4" schwerfaellt.
+  const ha = ((h % 12) + m / 60) * 30;
+  const ma = m * 6;
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} className="clock">
+      <circle cx="50" cy="50" r="47" className="clock-rim" />
+      {Array.from({ length: 60 }, (_, i) => (
+        <line key={i} x1="50" y1="7" x2="50" y2={i % 5 === 0 ? '13' : '10'}
+          className={`clock-tick ${i % 5 === 0 ? 'big' : ''}`}
+          transform={`rotate(${i * 6} 50 50)`} />
+      ))}
+      {Array.from({ length: 12 }, (_, i) => {
+        const a = ((i + 1) * 30 - 90) * Math.PI / 180;
+        return (
+          <text key={i} className="clock-num"
+            x={50 + Math.cos(a) * 33} y={50 + Math.sin(a) * 33}>{i + 1}</text>
+        );
+      })}
+      <line x1="50" y1="50" x2="50" y2="28" className="clock-hand hour"
+        transform={`rotate(${ha} 50 50)`} />
+      <line x1="50" y1="50" x2="50" y2="15" className="clock-hand minute"
+        transform={`rotate(${ma} 50 50)`} />
+      <circle cx="50" cy="50" r="3.4" className="clock-pin" />
+    </svg>
+  );
+};
+
+const two = (n: number) => (n < 10 ? `0${n}` : String(n));
+
+// Sprechweise wie im Unterricht. "halb 4" meint 3:30 — die haeufigste
+// Stolperstelle ueberhaupt, deshalb kommt sie oft dran.
+const timeWord = (h: number, m: number) => {
+  const next = h === 12 ? 1 : h + 1;
+  if (m === 0)  return `${h} Uhr`;
+  if (m === 15) return `Viertel nach ${h}`;
+  if (m === 30) return `halb ${next}`;
+  if (m === 45) return `Viertel vor ${next}`;
+  return `${m} Minuten nach ${h}`;
+};
+
+type ClockTask =
+  | { kind: 'read'; h: number; m: number }
+  | { kind: 'set'; h: number; m: number; options: { h: number; m: number }[] }
+  | { kind: 'span'; h1: number; m1: number; h2: number; m2: number; mins: number };
+
+// Volle und halbe Stunden haben Uebergewicht — sie stehen so auf dem Zettel.
+const READ_MINUTES = [0, 0, 0, 30, 30, 30, 15, 15, 45, 45, 5, 10, 20, 25, 35, 40, 50, 55];
+
+const rollClockTask = (kind: ClockTask['kind']): ClockTask => {
+  if (kind === 'read') {
+    return { kind, h: randInt(1, 12), m: pick(READ_MINUTES) };
+  }
+  if (kind === 'set') {
+    const h = randInt(1, 12);
+    const m = pick([0, 15, 30, 45]);
+    const next = h === 12 ? 1 : h + 1;
+    // Die Ablenker sind genau die typischen Verwechslungen: eine Stunde weiter
+    // (aus "halb 4" wird 4:30) und die anderen Viertel derselben Stunde.
+    const pool = [
+      { h, m: 0 }, { h, m: 15 }, { h, m: 30 }, { h, m: 45 },
+      { h: next, m: 0 }, { h: next, m: 30 }, { h: next, m: 15 }, { h: next, m: 45 },
+    ].filter(o => !(o.h === h && o.m === m));
+    return { kind, h, m, options: shuffle([{ h, m }, ...shuffle(pool).slice(0, 3)]) };
+  }
+  // Zeitspanne: hoechstens 55 Minuten, dafuer meistens ueber den Stundenwechsel —
+  // genau daran scheitert das Rechnen mit Uhrzeiten.
+  const h1 = randInt(1, 12);
+  const m1 = randInt(0, 11) * 5;
+  const mins = randInt(1, 11) * 5;
+  const total = m1 + mins;
+  const h2 = total >= 60 ? (h1 === 12 ? 1 : h1 + 1) : h1;
+  return { kind: 'span', h1, m1, h2, m2: total % 60, mins };
+};
+
+const UhrenTurm = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () => void }) => {
+  // Fester Plan statt freiem Wuerfeln: so kommt jeder der drei Typen in einer
+  // Runde sicher vor und nicht viermal dasselbe.
+  const plan = useRef<ClockTask['kind'][]>(
+    shuffle(['read', 'set', 'span', pick(['read', 'set', 'span'] as const)]));
+  const [task, setTask] = useState<ClockTask | null>(null);
+  const [vals, setVals] = useState(['', '']);
+  const [done, setDone] = useState([false, false]);
+  const [wrong, setWrong] = useState(-1);      // Index des falschen Feldes / der Uhr
+  const [solved, setSolved] = useState(0);
+  const advancing = useRef(false);
+  const ref0 = useRef<HTMLInputElement>(null);
+  const ref1 = useRef<HTMLInputElement>(null);
+  const refs = [ref0, ref1];
+
+  // Uhrzeiten lassen sich nicht wie die anderen Haeuser an der Eingabelaenge
+  // pruefen: bei "12 Uhr" waere die getippte 1 sofort ein Fehler, und bei
+  // "5 nach" waere die fuehrende 0 von "05" einer. Deshalb zaehlt hier eine
+  // Pause: richtig wird sofort erkannt, falsch erst, wenn das Kind aufhoert
+  // zu tippen.
+  const missTimer = useRef(0);
+  useEffect(() => () => clearTimeout(missTimer.current), []);
+
+  const gen = (idx: number) => {
+    clearTimeout(missTimer.current);
+    setTask(rollClockTask(plan.current[idx] ?? pick(['read', 'set', 'span'] as const)));
+    setVals(['', '']); setDone([false, false]); setWrong(-1);
+    advancing.current = false;
+    setTimeout(() => ref0.current?.focus(), 0);
+  };
+  useEffect(() => { gen(0); }, []);
+  useAutoFocus(done[0] && !done[1] ? ref1 : ref0, [task, done[0], done[1]]);
+  if (!task) return null;
+
+  const finish = () => {
+    advancing.current = true;
+    setTimeout(() => {
+      const n = solved + 1;
+      setSolved(n);
+      if (n >= 4) onWin('⏰');
+      else gen(n);
+    }, 1100);
+  };
+
+  const miss = (i: number, reset: () => void) => {
+    playSound('wrong');
+    setWrong(i);
+    setTimeout(() => { setWrong(-1); reset(); }, 500);
+  };
+
+  const clearMiss = () => { clearTimeout(missTimer.current); missTimer.current = 0; };
+  const scheduleMiss = (i: number, reset: () => void) => {
+    clearMiss();
+    missTimer.current = window.setTimeout(() => miss(i, reset), 900);
+  };
+
+  // ── Typ 1: Uhr ablesen ──
+  const readAnswers = task.kind === 'read' ? [task.h, task.m] : [0, 0];
+  const typeRead = (i: number, val: string) => {
+    if (done[i] || advancing.current) return;
+    setVals(v => v.map((x, k) => (k === i ? val : x)));
+    const num = parseInt(val); if (isNaN(num)) return;
+    if (num === readAnswers[i]) {
+      clearMiss();
+      playSound('correct');
+      const nd = done.map((x, k) => (k === i ? true : x));
+      setDone(nd);
+      if (nd[0] && nd[1]) finish();
+      else setTimeout(() => refs[1 - i].current?.focus(), 0);
+    } else {
+      scheduleMiss(i, () => {
+        setVals(v => v.map((x, k) => (k === i ? '' : x)));
+        refs[i].current?.focus();
+      });
+    }
+  };
+
+  // ── Typ 3: Zeitspanne ──
+  const typeSpan = (val: string) => {
+    if (advancing.current || task.kind !== 'span') return;
+    setVals(v => [val, v[1]]);
+    const num = parseInt(val); if (isNaN(num)) return;
+    if (num === task.mins) { clearMiss(); playSound('correct'); setDone([true, true]); finish(); }
+    else scheduleMiss(0, () => { setVals(['', '']); ref0.current?.focus(); });
+  };
+
+  // ── Typ 2: richtige Uhr antippen ──
+  const chooseClock = (i: number) => {
+    if (advancing.current || task.kind !== 'set') return;
+    const o = task.options[i];
+    if (o.h === task.h && o.m === task.m) { playSound('correct'); setDone([true, true]); finish(); }
+    else miss(i, () => {});
+  };
+
+  const solvedAll = done[0] && done[1];
+
+  return (
+    <div className="game-page" style={{ background: 'linear-gradient(160deg, #6d4c4128 0%, #fffaf5 100%)' }}>
+      <GameHeader category="uhrzeit" onBack={onBack} />
+      <div className="game-container uhr-container" style={{ '--house-color': '#6d4c41' } as any}>
+        <StarProgress solved={solved} total={4} />
+
+        {task.kind === 'read' && (
+          <>
+            <ClockFace h={task.h} m={task.m} size={190} />
+            <div className={`uhr-answer ${solvedAll ? 'solved' : ''}`}>
+              <input ref={ref0} className={`uhr-input ${done[0] ? 'done' : wrong === 0 ? 'wrong' : ''}`}
+                type="number" value={vals[0]} readOnly={done[0]}
+                onChange={e => typeRead(0, e.target.value)} />
+              <span className="uhr-colon">:</span>
+              <input ref={ref1} className={`uhr-input ${done[1] ? 'done' : wrong === 1 ? 'wrong' : ''}`}
+                type="number" value={done[1] ? two(task.m) : vals[1]} readOnly={done[1]}
+                onChange={e => typeRead(1, e.target.value)} />
+              <span className="uhr-unit">Uhr</span>
+            </div>
+            {solvedAll && <div className="uhr-word">{timeWord(task.h, task.m)}</div>}
+          </>
+        )}
+
+        {task.kind === 'set' && (
+          <>
+            <div className="uhr-prompt">Welche Uhr zeigt <b>{timeWord(task.h, task.m)}</b>?</div>
+            <div className="uhr-choices">
+              {task.options.map((o, i) => {
+                const right = o.h === task.h && o.m === task.m;
+                return (
+                  <button key={i}
+                    className={`uhr-choice ${wrong === i ? 'wrong' : ''} ${solvedAll && right ? 'right' : ''}`}
+                    onClick={() => chooseClock(i)}>
+                    <ClockFace h={o.h} m={o.m} size={112} />
+                    {solvedAll && right && <span className="uhr-choice-label">{o.h}:{two(o.m)}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {task.kind === 'span' && (
+          <>
+            <div className="uhr-span">
+              <div className="uhr-span-one">
+                <ClockFace h={task.h1} m={task.m1} size={118} />
+                <span className="uhr-span-time">{task.h1}:{two(task.m1)}</span>
+                <span className="uhr-span-tag">Start</span>
+              </div>
+              <div className="uhr-span-arrow">→</div>
+              <div className="uhr-span-one">
+                <ClockFace h={task.h2} m={task.m2} size={118} />
+                <span className="uhr-span-time">{task.h2}:{two(task.m2)}</span>
+                <span className="uhr-span-tag">Ende</span>
+              </div>
+            </div>
+            <div className={`uhr-answer ${solvedAll ? 'solved' : ''}`}>
+              <input ref={ref0} className={`uhr-input wide ${done[0] ? 'done' : wrong === 0 ? 'wrong' : ''}`}
+                type="number" value={vals[0]} readOnly={done[0]}
+                onChange={e => typeSpan(e.target.value)} />
+              <span className="uhr-unit">Minuten</span>
+            </div>
+          </>
+        )}
+
+        <p className="div-hint">
+          {task.kind === 'read'
+            ? (solvedAll ? '🎉 Genau — kurzer Zeiger die Stunde, langer die Minuten.'
+              : '⏰ Wie spät ist es? Erst die Stunde, dann die Minuten.')
+            : task.kind === 'set'
+              ? (solvedAll ? '🎉 Richtig erkannt!' : '⏰ Achtung: der kurze Zeiger steht oft schon zwischen zwei Zahlen.')
+              : (solvedAll ? '🎉 Geschafft!' : '⏰ Wie viele Minuten liegen zwischen Start und Ende?')}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const MathGame = ({ category, performance, onAttempt, onWin, onBack }: { category: Category; performance: PerformanceData; onAttempt: (k: string, c: boolean) => void; onWin: (s: string) => void; onBack: () => void }) => {
   const [problem, setProblem] = useState(generateProblem(category, performance));
   const [input, setInput] = useState('');
   const [solved, setSolved] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useAutoFocus(inputRef, [problem]);
   const total = (category === 'sachaufgaben' || category === 'platzhalter') ? 3 : 5;
   const building = BUILDINGS.find(b => b.category === category)!;
   const check = (val: string) => {
@@ -1560,7 +1859,7 @@ const MathGame = ({ category, performance, onAttempt, onWin, onBack }: { categor
               </div>
             : <div className="task">{problem.question}{problem.type !== 'placeholder' && ' = ?'}</div>
         }
-        <input autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} />
+        <input ref={inputRef} autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} />
       </div>
     </div>
   );
@@ -1636,6 +1935,7 @@ export default function App() {
   if (state.category === 'division-zerlegen') return <ZerlegeDivision onWin={onWin} onBack={onBack} />;
   if (state.category === 'division-rest')     return <RestHaus onWin={onWin} onBack={onBack} />;
   if (state.category === 'punkt-vor-strich')  return <PunktVorStrich onWin={onWin} onBack={onBack} />;
+  if (state.category === 'uhrzeit')           return <UhrenTurm onWin={onWin} onBack={onBack} />;
   if (state.category === 'zahlen-fabrik')    return <FactoryGame onWin={onWin} onBack={onBack} />;
   if (state.category === 'meister-zelt')     return <ComparisonGame onWin={onWin} onBack={onBack} />;
   if (state.category === 'zahlen-mauer')     return <NumberWall onWin={onWin} onBack={onBack} />;

@@ -1615,3 +1615,134 @@ body {
 
 .pvs-check { color: #4caf50; font-size: 1.4rem; }
 .pvs-note  { color: #d84315; }
+
+/* ======================================================
+   UHREN-TURM — Ablesen, Einstellen, Zeitspannen
+   ====================================================== */
+
+.uhr-container { max-width: 620px; }
+
+.clock { display: block; margin: 0 auto; }
+.clock-rim {
+  fill: #fffdf7;
+  stroke: #6d4c41;
+  stroke-width: 4;
+}
+.clock-tick { stroke: #bcaaa4; stroke-width: 1.2; stroke-linecap: round; }
+.clock-tick.big { stroke: #6d4c41; stroke-width: 2.4; }
+.clock-num {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  fill: #4e342e;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.clock-hand { stroke-linecap: round; }
+/* Kurz und dick gegen lang und duenn — ohne diesen Kontrast ist die Uhr fuer
+   ein Kind, das noch zaehlt, nicht eindeutig lesbar. */
+.clock-hand.hour   { stroke: #4e342e; stroke-width: 5.5; }
+.clock-hand.minute { stroke: #d84315; stroke-width: 3.2; }
+.clock-pin { fill: #4e342e; }
+
+.uhr-answer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  font-weight: bold;
+  color: #4e342e;
+  margin: 1rem 0 0.2rem;
+}
+.uhr-answer.solved { color: #2e7d32; }
+.uhr-colon { margin: 0 0.1rem; }
+.uhr-unit { font-size: 0.55em; color: #8d6e63; margin-left: 0.4rem; }
+
+.uhr-input {
+  width: 2.6ch;
+  font-size: inherit;
+  font-weight: bold;
+  font-family: inherit;
+  text-align: center;
+  padding: 0 0.1rem;
+  border: none;
+  border-bottom: 4px solid #6d4c41;
+  background: rgba(255,255,255,0.75);
+  border-radius: 8px 8px 0 0;
+  color: inherit;
+  outline: none;
+}
+.uhr-input.wide { width: 3.6ch; }
+.uhr-input:focus { background: #fff; box-shadow: 0 3px 10px rgba(109,76,65,0.25); }
+.uhr-input.done  { border-bottom-color: #66bb6a; color: #2e7d32; }
+.uhr-input.wrong { border-bottom-color: #ef5350; color: #c62828; animation: zlShake 0.35s; }
+.uhr-input::-webkit-outer-spin-button,
+.uhr-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.uhr-input { -moz-appearance: textfield; appearance: textfield; }
+
+/* Nach dem Ablesen die Sprechweise nachreichen — "3:30" und "halb 4" muessen
+   als dasselbe abgespeichert werden. */
+.uhr-word {
+  font-size: clamp(1.1rem, 4.5vw, 1.5rem);
+  font-weight: bold;
+  color: #2e7d32;
+  animation: popIn 0.35s ease-out;
+}
+
+.uhr-prompt {
+  font-size: clamp(1.1rem, 4.5vw, 1.6rem);
+  color: #5d4037;
+  margin: 0.5rem 0 1rem;
+}
+.uhr-prompt b { color: #d84315; }
+
+.uhr-choices {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.8rem;
+  justify-items: center;
+}
+.uhr-choice {
+  position: relative;
+  padding: 0.4rem;
+  border: 3px solid #d7ccc8;
+  border-radius: 18px;
+  background: #fff;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.15s, background 0.15s;
+}
+.uhr-choice:hover  { border-color: #8d6e63; transform: translateY(-3px); }
+.uhr-choice:active { transform: translateY(1px); }
+.uhr-choice.wrong  { border-color: #ef5350; background: #ffebee; animation: zlShake 0.35s; }
+.uhr-choice.right  { border-color: #66bb6a; background: #e8f5e9; }
+.uhr-choice-label {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #2e7d32;
+}
+
+.uhr-span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+}
+.uhr-span-one { display: flex; flex-direction: column; align-items: center; }
+.uhr-span-time {
+  font-size: clamp(1.1rem, 4.5vw, 1.5rem);
+  font-weight: bold;
+  color: #4e342e;
+}
+.uhr-span-tag { font-size: 0.85rem; color: #8d6e63; }
+.uhr-span-arrow { font-size: 2rem; color: #8d6e63; }
+
+@media (max-width: 820px), (max-height: 820px) {
+  .uhr-container { padding: 1.2rem 0.8rem; }
+  .uhr-choices { gap: 0.5rem; }
+  .uhr-choice { padding: 0.25rem; border-width: 2.5px; border-radius: 14px; }
+  .uhr-span { gap: 0.3rem; }
+  .uhr-span-arrow { font-size: 1.4rem; }
+}
