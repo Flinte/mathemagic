@@ -1,6 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Trash2, Star } from 'lucide-react';
 
+// --- Zufall ---
+// Alle Generatoren ziehen ueber diese Helfer, damit Verteilung und
+// Wiederholungs-Schutz an genau einer Stelle liegen.
+
+// Ganzzahl in [min, max] — beide Grenzen eingeschlossen.
+const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
+
+const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
+
+// Fisher-Yates. Das naheliegende `sort(() => Math.random() - 0.5)` ist KEIN
+// gueltiger Shuffle: Vergleichsfunktionen muessen konsistent sein, sonst haengt
+// das Ergebnis am Sortier-Algorithmus. Gemessen an der Zahlen-Mauer wurde damit
+// Stein 1 in 57 % der Runden versteckt, Stein 4 nur in 39 % — die Mauer fragte
+// also immer wieder dieselben Positionen ab.
+const shuffle = <T,>(list: readonly T[]): T[] => {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+
+// Zieht eine Aufgabe, die nicht unter den letzten `memory` Aufgaben desselben
+// Fachs war. Ohne das kann bei freiem Wuerfeln dieselbe Aufgabe sofort wieder
+// kommen — im Spiegel-Haus (20 moegliche Aufgaben) enthielt so jede siebte
+// 3er-Runde eine Dopplung.
+//
+// `memory` muss klar unter dem Vorrat bleiben, sonst laeuft die Suche leer und
+// wir setzen doch eine Wiederholung vor — deshalb steht der Wert je Fach unten
+// neben dem Generator und nicht als globale Konstante.
+const recent: Record<string, string[]> = {};
+const drawFresh = <T,>(bucket: string, memory: number, roll: () => T, idOf: (t: T) => string): T => {
+  const seen = recent[bucket] ?? (recent[bucket] = []);
+  let out = roll();
+  for (let tries = 0; tries < 60 && seen.includes(idOf(out)); tries++) out = roll();
+  seen.push(idOf(out));
+  while (seen.length > memory) seen.shift();
+  return out;
+};
+
 // --- Sound Engine ---
 // Ein einziger AudioContext für die ganze App — Browser erlauben nur eine Handvoll
 // gleichzeitig, und jeder neue kostet spürbar Zeit beim Anlegen.
@@ -37,12 +78,15 @@ const playSound = (type: 'correct' | 'wrong') => {
 type Category =
   | 'plus' | 'minus' | 'verdoppeln-halbieren'
   | 'einmaleins-klein' | 'einmaleins-gross' | 'einmaleins-tafel'
-  | 'division' | 'division-zerlegen' | 'tausch-arena' | 'kernaufgaben'
-  | 'sachaufgaben' | 'platzhalter'
+  | 'division' | 'division-zerlegen' | 'division-rest' | 'tausch-arena' | 'kernaufgaben'
+  | 'sachaufgaben' | 'platzhalter' | 'punkt-vor-strich'
   | 'zahlen-fabrik' | 'meister-zelt' | 'differenz-jagd' | 'zahlen-mauer';
 
 const STICKERS = ['⭐', '🌟', '🦄', '🚀', '🎨', '🍕', '🐱', '🐶', '🌈', '🍦', '🍩', '🦁', '🦉', '💎', '🍭', '⚙️', '🏆', '🎈', '🏰'];
+// Der Panda ist das Maskottchen der Klasse 3b und wohnt von Anfang an im Dorf —
+// Schwelle 0. Alle anderen Tiere ziehen nach und nach zu.
 const ANIMAL_TIERS = [
+  { threshold: 0,  emoji: '🐼' },
   { threshold: 5,  emoji: '🐰' },
   { threshold: 10, emoji: '🦌' },
   { threshold: 15, emoji: '🦊' },
@@ -53,6 +97,7 @@ const ANIMAL_TIERS = [
 
 // Fixed spots on the map where each tier animal lives
 const ANIMAL_SPOTS: { threshold: number; emoji: string; left: string; top: string }[] = [
+  { threshold: 0,  emoji: '🐼', left: '30%', top: '71%' },   // im Bambushain
   { threshold: 5,  emoji: '🐰', left: '17%', top: '90%' },
   { threshold: 10, emoji: '🦌', left: '5%',  top: '57%' },
   { threshold: 15, emoji: '🦊', left: '27%', top: '85%' },
@@ -66,63 +111,128 @@ interface PerformanceData { [key: string]: number; }
 const DEFAULT_STICKERS: Record<Category, string[]> = {
   plus: [], minus: [], 'verdoppeln-halbieren': [],
   'einmaleins-klein': [], 'einmaleins-gross': [], 'einmaleins-tafel': [],
-  division: [], 'division-zerlegen': [], 'tausch-arena': [], kernaufgaben: [],
-  sachaufgaben: [], platzhalter: [],
+  division: [], 'division-zerlegen': [], 'division-rest': [], 'tausch-arena': [], kernaufgaben: [],
+  sachaufgaben: [], platzhalter: [], 'punkt-vor-strich': [],
   'zahlen-fabrik': [], 'meister-zelt': [], 'differenz-jagd': [], 'zahlen-mauer': [],
 };
 
-const generateProblem = (category: Category, _performance: PerformanceData = {}): any => {
+// Namen wechseln die Aufgabentexte durch, ohne die Rechnung zu aendern — das
+// hebt die gefuehlte Vielfalt der Rechen-Post deutlich, weil zwei Aufgaben mit
+// derselben Rechnung trotzdem verschieden aussehen.
+const NAMES = ['Lilly', 'Klaus', 'Mia', 'Jonas', 'Emma', 'Ben', 'Frieda', 'Paul', 'Nele', 'Ali', 'Sofia', 'Levi'];
+
+// Aufgaben-Vorlagen der Rechen-Post. Vorher waren es zwei — damit bestand jede
+// 3er-Runde zwangslaeufig aus zwei gleichen Aufgaben. Mal und Geteilt sind
+// bewusst dabei, das sind Themen der naechsten Klassenarbeit.
+const STORY_TEMPLATES: (() => { question: string[]; answer: number; key: string })[] = [
+  () => { const n = pick(NAMES), x = randInt(2, 5), y = randInt(2, 4), z = randInt(3, 7); return {
+    question: [`${n} kauft ${x} Kaugummis für je ${y} €.`, `Dazu eine Schokolade für ${z} €.`, `Reichen ${n}s 20 €? (1 = Ja, 0 = Nein)`],
+    answer: 20 >= x * y + z ? 1 : 0, key: 'story_budget' }; },
+  () => { const n = pick(NAMES), x = randInt(12, 30), y = randInt(2, 9); return {
+    question: [`${n} hat ${x} €.`, `Für ein Eis gehen ${y} € weg.`, `Wie viele Euro bleiben übrig?`],
+    answer: x - y, key: 'story_rest' }; },
+  () => { const n = pick(NAMES), k = randInt(2, 6), q = randInt(2, 9); return {
+    question: [`${n} teilt ${k * q} Gummibärchen`, `gerecht an ${k} Kinder aus.`, `Wie viele bekommt jedes Kind?`],
+    answer: q, key: 'story_teilen' }; },
+  () => { const n = pick(NAMES), p = randInt(3, 8), q = randInt(3, 9); return {
+    question: [`${n} packt ${p} Schachteln ein.`, `In jede kommen ${q} Stifte.`, `Wie viele Stifte sind das zusammen?`],
+    answer: p * q, key: 'story_mal' }; },
+  () => { const r = randInt(4, 9); return {
+    question: [`Im Bus stehen ${r} Sitzreihen.`, `In jeder Reihe sind 4 Plätze.`, `Wie viele Kinder passen hinein?`],
+    answer: r * 4, key: 'story_bus' }; },
+  () => { const n = pick(NAMES), hat = randInt(8, 25), braucht = randInt(30, 50); return {
+    question: [`${n} sammelt Sticker.`, `${n} hat schon ${hat} Stück, das Album braucht ${braucht}.`, `Wie viele fehlen noch?`],
+    answer: braucht - hat, key: 'story_fehlt' }; },
+  () => { const n = pick(NAMES), k = randInt(2, 8), preis = randInt(2, 9); return {
+    question: [`${n} kauft ${k} gleiche Hefte.`, `Zusammen kosten sie ${k * preis} €.`, `Was kostet ein Heft?`],
+    answer: preis, key: 'story_stueckpreis' }; },
+  () => { const b = randInt(3, 7), s = randInt(3, 8); return {
+    question: [`Ein Strauß besteht aus ${b} Blumen.`, `Die Gärtnerin bindet ${s} Sträuße.`, `Wie viele Blumen braucht sie?`],
+    answer: b * s, key: 'story_blumen' }; },
+  () => { const n = pick(NAMES), tage = randInt(3, 7), pro = randInt(4, 9); return {
+    question: [`${n} liest jeden Tag ${pro} Seiten.`, `Das macht ${n} ${tage} Tage lang.`, `Wie viele Seiten sind das?`],
+    answer: tage * pro, key: 'story_lesen' }; },
+];
+
+const rollProblem = (category: Category): any => {
   let a, b;
 
   if (category === 'platzhalter') {
-    const type = Math.floor(Math.random() * 3);
-    a = Math.floor(Math.random() * 10) + 2;
-    const ans = Math.floor(Math.random() * 10) + 2;
-    if (type === 0) return { question: `? + ${a} = ${ans + a}`, answer: ans, key: 'placeholder', type: 'placeholder' };
-    if (type === 1) return { question: `${a} + ? = ${ans + a}`, answer: ans, key: 'placeholder', type: 'placeholder' };
-    return { question: `? - ${a} = ${ans}`, answer: ans + a, key: 'placeholder', type: 'placeholder' };
+    // Mal und Geteilt gehoeren mit dazu — Zahlenraetsel der Klassenarbeit
+    // fragen nicht nur nach Plus und Minus.
+    const type = randInt(0, 5);
+    if (type <= 2) {
+      a = randInt(2, 11);
+      const ans = randInt(2, 11);
+      if (type === 0) return { question: `? + ${a} = ${ans + a}`, answer: ans, key: 'ph_plus', type: 'placeholder' };
+      if (type === 1) return { question: `${a} + ? = ${ans + a}`, answer: ans, key: 'ph_plus', type: 'placeholder' };
+      return { question: `? − ${a} = ${ans}`, answer: ans + a, key: 'ph_minus', type: 'placeholder' };
+    }
+    a = randInt(2, 10);
+    b = randInt(2, 10);
+    if (type === 3) return { question: `? × ${a} = ${a * b}`, answer: b, key: 'ph_mal', type: 'placeholder' };
+    if (type === 4) return { question: `${a} × ? = ${a * b}`, answer: b, key: 'ph_mal', type: 'placeholder' };
+    return { question: `${a * b} : ? = ${b}`, answer: a, key: 'ph_geteilt', type: 'placeholder' };
   }
 
-  if (category === 'sachaufgaben') {
-    const templates = [
-      () => { const x = Math.floor(Math.random() * 4) + 2; const y = Math.floor(Math.random() * 3) + 1; const z = Math.floor(Math.random() * 5) + 3; const total = x * y + z; return { question: [`Klaus kauft ${x} Kaugummis für je ${y} €.`, `Dazu eine Schokolade für ${z} €.`, `Reichen seine 20 €? (1=Ja, 0=Nein)`], answer: 20 >= total ? 1 : 0, key: 'story' }; },
-      () => { const x = Math.floor(Math.random() * 10) + 10; const y = Math.floor(Math.random() * 8) + 2; return { question: [`Lilly hat ${x} €.`, `Sie gibt ${y} € für Eis aus.`, `Wie viele Euro hat sie noch?`], answer: x - y, key: 'story' }; },
-    ];
-    return { ...templates[Math.floor(Math.random() * templates.length)](), type: 'story' };
-  }
+  if (category === 'sachaufgaben') return { ...pick(STORY_TEMPLATES)(), type: 'story' };
 
   if (category === 'einmaleins-klein' || category === 'einmaleins-gross') {
-    const max = category === 'einmaleins-klein' ? 5 : 10;
-    a = Math.floor(Math.random() * (max - 1)) + 2;
-    b = Math.floor(Math.random() * 10) + 1;
+    a = category === 'einmaleins-klein' ? randInt(2, 5) : randInt(2, 10);
+    b = randInt(1, 10);
     return { question: `${a} × ${b}`, answer: a * b, key: `${a}x${b}` };
   }
 
   if (category === 'division') {
     // Wird nur noch als Fallback genutzt — routing geht zu DivisionGame
-    a = Math.floor(Math.random() * 9) + 2;
-    b = Math.floor(Math.random() * 10) + 1;
+    a = randInt(2, 10);
+    b = randInt(1, 10);
     return { question: `${a * b} : ${a}`, answer: b, key: 'div_result' };
   }
 
   if (category === 'kernaufgaben') {
-    const kernRows = [2, 5, 10];
-    a = kernRows[Math.floor(Math.random() * kernRows.length)];
-    b = Math.floor(Math.random() * 10) + 1;
-    if (Math.random() > 0.5) return { question: `${a} × ${b}`, answer: a * b, key: 'kern_mult' };
-    return { question: `${a * b} ÷ ${a}`, answer: b, key: 'kern_div' };
+    a = pick([2, 5, 10]);
+    b = randInt(1, 10);
+    if (Math.random() < 0.5) return { question: `${a} × ${b}`, answer: a * b, key: 'kern_mult' };
+    return { question: `${a * b} : ${a}`, answer: b, key: 'kern_div' };
   }
 
   if (category === 'verdoppeln-halbieren') {
-    if (Math.random() > 0.5) { a = Math.floor(Math.random() * 10) + 1; return { question: `Doppelt von ${a}`, answer: a * 2, key: 'double' }; }
-    a = Math.floor(Math.random() * 10) * 2 + 2;
+    // Bis 20 statt bis 10: verdoppelt das reicht bis 40 und damit ueber den
+    // Zahlenraum, in dem die Kernaufgaben-Strategie geuebt wird.
+    if (Math.random() < 0.5) { a = randInt(1, 20); return { question: `Doppelt von ${a}`, answer: a * 2, key: 'double' }; }
+    a = randInt(1, 20) * 2;
     return { question: `Hälfte von ${a}`, answer: a / 2, key: 'half' };
   }
 
-  if (category === 'plus') { a = Math.floor(Math.random() * 10) + 5; b = Math.floor(Math.random() * 10) + 5; return { question: `${a} + ${b}`, answer: a + b, key: 'plus' }; }
-  if (category === 'minus') { a = Math.floor(Math.random() * 15) + 5; b = Math.floor(Math.random() * a) + 1; return { question: `${a} - ${b}`, answer: a - b, key: 'minus' }; }
+  if (category === 'plus') { a = randInt(5, 14); b = randInt(5, 14); return { question: `${a} + ${b}`, answer: a + b, key: 'plus' }; }
+  if (category === 'minus') { a = randInt(6, 20); b = randInt(1, a - 1); return { question: `${a} − ${b}`, answer: a - b, key: 'minus' }; }
   return { question: '?', answer: 0, key: 'unknown' };
 };
+
+// Wie viele der zuletzt gestellten Aufgaben je Haus gesperrt bleiben. Der Wert
+// muss deutlich unter dem Vorrat des Hauses liegen: `einmaleins-klein` kennt nur
+// 40 Aufgaben, eine Sperre von 20 wuerde die Auswahl spuerbar verarmen lassen.
+const VARIETY: Record<string, number> = {
+  'verdoppeln-halbieren': 8,
+  'einmaleins-klein': 8,
+  'kernaufgaben': 10,
+  'sachaufgaben': 4,
+  'einmaleins-gross': 15,
+  'platzhalter': 15,
+  'plus': 15,
+  'minus': 15,
+};
+
+const generateProblem = (category: Category, _performance: PerformanceData = {}): any =>
+  drawFresh(
+    category,
+    VARIETY[category] ?? 10,
+    () => rollProblem(category),
+    // Sachaufgaben ueber den Text vergleichen, sonst gaelten zwei Aufgaben
+    // derselben Vorlage mit verschiedenen Zahlen faelschlich als Wiederholung.
+    p => (Array.isArray(p.question) ? p.question.join('|') : String(p.question)),
+  );
 
 // ============================================================
 // MAP COMPONENTS
@@ -191,6 +301,32 @@ const PATHS: { d: string; w: number }[] = [
   { d: PATH_EAST, w: 26 }, { d: PATH_ADVENTURE, w: 24 }, { d: PATH_RIGHT, w: 24 },
   { d: PATH_LAKE, w: 20 }, { d: PATH_SOUTH, w: 18 },
 ];
+
+// Bambushain — das Zuhause des Pandas. Halme werden leicht unterschiedlich
+// hoch und geneigt gezeichnet; ein Hain aus identischen Halmen liest sich sofort
+// als Zaun statt als Pflanze.
+// Zwei Gruppen mit einer Luecke in der Mitte — dort steht der Panda, sonst
+// verschwindet er hinter den Halmen.
+const BAMBOO_SPOTS: { x: number; y: number; h: number; lean: number }[] = [
+  { x: 352, y: 524, h: 62, lean: -5 }, { x: 366, y: 530, h: 82, lean: 2 },
+  { x: 379, y: 522, h: 54, lean: 4 },
+  { x: 424, y: 528, h: 76, lean: -3 }, { x: 437, y: 521, h: 58, lean: 4 },
+  { x: 449, y: 530, h: 88, lean: -2 },
+];
+
+const MapBamboo = ({ x, y, h, lean }: { x: number; y: number; h: number; lean: number }) => (
+  <g transform={`translate(${x},${y}) rotate(${lean})`}>
+    <ellipse cx="0" cy="2" rx="11" ry="4" fill="#4a7f38" opacity="0.3" filter="url(#fSoft)" />
+    <rect x="-3" y={-h} width="6" height={h} rx="3" fill="#7cb342" />
+    {/* Knoten: die Segmentierung ist das, was einen Halm als Bambus lesbar macht */}
+    {Array.from({ length: Math.floor(h / 18) }, (_, i) => (
+      <rect key={i} x="-4" y={-h + 14 + i * 18} width="8" height="2.5" rx="1.2" fill="#558b2f" />
+    ))}
+    <path d={`M 2 ${-h + 8} q 16 -8 24 2 q -16 4 -24 -2 Z`} fill="#8bc34a" />
+    <path d={`M -2 ${-h + 26} q -18 -7 -26 3 q 17 4 26 -3 Z`} fill="#689f38" />
+    <path d={`M 2 ${-h + 44} q 15 -6 22 3 q -15 3 -22 -3 Z`} fill="#8bc34a" opacity="0.9" />
+  </g>
+);
 
 const MapTree = ({ x, y, s = 1 }: { x: number; y: number; s?: number }) => (
   <g transform={`translate(${x},${y}) scale(${s})`}>
@@ -328,6 +464,9 @@ const MapTerrain = () => (
 
     {/* Bäume */}
     {TREE_SPOTS.map((t, i) => <MapTree key={`tr${i}`} x={t.x} y={t.y} s={t.s} />)}
+
+    {/* Bambushain des Pandas */}
+    {BAMBOO_SPOTS.map((b, i) => <MapBamboo key={`bb${i}`} x={b.x} y={b.y} h={b.h} lean={b.lean} />)}
   </svg>
 );
 
@@ -352,11 +491,13 @@ const BUILDINGS: {
   { category: 'einmaleins-tafel',     label: '1×1 Tafel',      icon: '📋', color: '#e91e63', roofColor: '#880e4f', shape: 'workshop', left: '43%', top: '41%' },
   { category: 'division',             label: 'Divisions-Haus', icon: '➗', color: '#1e88e5', roofColor: '#0d47a1', shape: 'twostory', left: '58%', top: '22%' },
   { category: 'division-zerlegen',    label: 'Zerlege-Werkstatt', icon: '🧩', color: '#00897b', roofColor: '#004d40', shape: 'workshop', left: '64%', top: '38%' },
+  { category: 'division-rest',       label: 'Rest-Haus',      icon: '🍪', color: '#0097a7', roofColor: '#006064', shape: 'cottage',  left: '33%', top: '48%' },
   { category: 'kernaufgaben',         label: 'Kern-Trainer',   icon: '🔑', color: '#fb8c00', roofColor: '#e65100', shape: 'cottage',  left: '55%', top: '51%' },
   { category: 'tausch-arena',         label: 'Tausch-Arena',   icon: '🏡', color: '#43a047', roofColor: '#1b5e20', shape: 'barrel',   left: '45%', top: '62%' },
   // Zone 3 – Abenteuerviertel
   { category: 'sachaufgaben',         label: 'Rechen-Post',    icon: '✉️', color: '#f4511e', roofColor: '#bf360c', shape: 'cottage',  left: '70%', top: '17%' },
   { category: 'platzhalter',          label: 'Rätsel-Höhle',   icon: '🔍', color: '#8d6e63', roofColor: '#4e342e', shape: 'tower',    left: '80%', top: '37%' },
+  { category: 'punkt-vor-strich',    label: 'Vorfahrt-Haus',  icon: '🚦', color: '#3949ab', roofColor: '#1a237e', shape: 'twostory', left: '88%', top: '48%' },
   { category: 'zahlen-fabrik',        label: 'Zahlen-Fabrik',  icon: '⚙️', color: '#546e7a', roofColor: '#263238', shape: 'workshop', left: '74%', top: '57%' },
   { category: 'meister-zelt',         label: 'Meister-Zelt',   icon: '🏆', color: '#ffca28', roofColor: '#f57f17', shape: 'tent',     left: '84%', top: '67%' },
   { category: 'differenz-jagd',       label: 'Differenz-See',  icon: '🌊', color: '#29b6f6', roofColor: '#01579b', shape: 'barrel',   left: '69%', top: '80%' },
@@ -549,9 +690,9 @@ const NumberWall = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () 
   const [solvedCount, setSolvedCount] = useState(0);
 
   const generateWall = () => {
-    const b1 = Math.floor(Math.random() * 10) + 1;
-    const b2 = Math.floor(Math.random() * 10) + 1;
-    const b3 = Math.floor(Math.random() * 10) + 1;
+    const b1 = randInt(1, 10);
+    const b2 = randInt(1, 10);
+    const b3 = randInt(1, 10);
     const fullWall = [b1 + b2 + b2 + b3, b1 + b2, b2 + b3, b1, b2, b3];
     const relations: [number, number, number][] = [[0, 1, 2], [1, 3, 4], [2, 4, 5]];
     const isSolvable = (hidden: number[]) => {
@@ -570,7 +711,7 @@ const NumberWall = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () 
       return known.length === 6;
     };
     let hidden: number[];
-    do { hidden = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5).slice(0, 3); } while (!isSolvable(hidden));
+    do { hidden = shuffle([0, 1, 2, 3, 4, 5]).slice(0, 3); } while (!isSolvable(hidden));
     setWall(fullWall);
     setInputs(hidden.reduce((acc, idx) => ({ ...acc, [idx]: '' }), {}));
   };
@@ -625,13 +766,23 @@ const DifferenceHunt = ({ onWin, onBack }: { onWin: (s: string) => void; onBack:
   const req = useRef<number | null>(null);
 
   const spawn = () => {
-    const a = Math.floor(Math.random() * 15) + 5;
-    const d = Math.floor(Math.random() * 5) + 1;
-    const b = Math.random() > 0.5 ? a + d : a - d;
+    // Die Differenz lag frueher immer zwischen 1 und 5. Bei sechs Blasen aus
+    // 1..15 war die richtige damit fast immer die kleinste — das Spiel liess
+    // sich erraten, ohne zu rechnen. Jetzt reicht sie bis 12.
+    // Gesperrt wird die Differenz, nicht das Zahlenpaar: 17/23 und 24/30 sind
+    // fuer das Kind dieselbe Uebung, wenn beide Male 6 herauskommt.
+    const d = drawFresh('differenz-see', 4, () => randInt(2, 12), x => String(x));
+    const a = randInt(Math.max(5, d + 1), 30);
+    const b = Math.random() < 0.5 ? a + d : a - d;
     setNums({ a, b, diff: Math.abs(a - b) });
-    const pool = [Math.abs(a - b)];
-    while (pool.length < 6) { const v = Math.floor(Math.random() * 15) + 1; if (!pool.includes(v)) pool.push(v); }
-    setBubbles(pool.sort(() => Math.random() - 0.5).map(v => ({ id: Math.random(), val: v, x: Math.random() * 80 + 10, y: Math.random() * 60 + 20, vx: (Math.random() - 0.5) * 0.1, vy: (Math.random() - 0.5) * 0.1 })));
+    // Ablenker liegen dicht um die Loesung herum, damit wirklich gerechnet
+    // werden muss statt nach der auffaelligsten Zahl zu greifen.
+    const pool = [d];
+    while (pool.length < 6) {
+      const v = d + randInt(-4, 4);
+      if (v >= 1 && !pool.includes(v)) pool.push(v);
+    }
+    setBubbles(shuffle(pool).map(v => ({ id: Math.random(), val: v, x: Math.random() * 80 + 10, y: Math.random() * 60 + 20, vx: (Math.random() - 0.5) * 0.1, vy: (Math.random() - 0.5) * 0.1 })));
   };
   useEffect(() => spawn(), []);
   const anim = () => { setBubbles(prev => prev.map(b => { let nx = b.x + b.vx, ny = b.y + b.vy, nvx = b.vx, nvy = b.vy; if (nx < 5 || nx > 90) nvx *= -1; if (ny < 15 || ny > 85) nvy *= -1; return { ...b, x: nx, y: ny, vx: nvx, vy: nvy }; })); req.current = requestAnimationFrame(anim); };
@@ -664,11 +815,14 @@ const DifferenceHunt = ({ onWin, onBack }: { onWin: (s: string) => void; onBack:
 };
 
 const FactoryGame = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () => void }) => {
-  const [target, setTarget] = useState(Math.floor(Math.random() * 10) + 10);
+  // Ziele von 10..19 bedeuteten nur zehn verschiedene Runden; jede vierte
+  // 3er-Runde enthielt dasselbe Ziel zweimal.
+  const rollTarget = () => drawFresh('fabrik-ziel', 6, () => randInt(11, 29), x => String(x));
+  const [target, setTarget] = useState(rollTarget);
   const [grid, setGrid] = useState<({ id: number; val: number } | null)[]>([]);
   const [sel, setSel] = useState<number[]>([]);
   const [solved, setSolved] = useState(0);
-  const fill = (ex: ({ id: number; val: number } | null)[] = []) => { const n = [...ex]; for (let i = 0; i < 25; i++) if (!n[i]) n[i] = { id: Math.random(), val: Math.floor(Math.random() * 9) + 1 }; return n; };
+  const fill = (ex: ({ id: number; val: number } | null)[] = []) => { const n = [...ex]; for (let i = 0; i < 25; i++) if (!n[i]) n[i] = { id: Math.random(), val: randInt(1, 9) }; return n; };
   useEffect(() => setGrid(fill()), []);
   const click = (idx: number) => {
     if (sel.includes(idx)) { setSel(p => p.filter(i => i !== idx)); return; }
@@ -678,7 +832,7 @@ const FactoryGame = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: ()
       const ng = [...grid]; ns.forEach(i => { ng[i] = null; }); setGrid(fill(ng)); setSel([]);
       setSolved(c => c + 1);
       if (solved + 1 >= 5) onWin('⚙️');
-      else setTarget(Math.floor(Math.random() * 10) + 10);
+      else setTarget(rollTarget());
     } else if (sum > target) { playSound('wrong'); setSel([]); } else setSel(ns);
   };
   return (
@@ -764,7 +918,14 @@ const TauschArena = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: ()
   const [input, setInput] = useState('');
   const [done, setDone] = useState<number[]>([]);
   const [completed, setCompleted] = useState(0);
-  const genFamily = () => { const a = Math.floor(Math.random() * 8) + 2; const b = Math.floor(Math.random() * 8) + 2; setFamily({ a, b, p: a * b }); setStep(0); setInput(''); setDone([]); };
+  const genFamily = () => {
+    // 4 x 7 und 7 x 4 sind dieselbe Aufgaben-Familie — deshalb wird die Sperre
+    // ueber das sortierte Paar gefuehrt und nicht ueber a und b einzeln.
+    const f = drawFresh('tausch-arena', 12,
+      () => ({ a: randInt(2, 9), b: randInt(2, 9) }),
+      ({ a, b }) => [a, b].sort((x, y) => x - y).join('x'));
+    setFamily({ ...f, p: f.a * f.b }); setStep(0); setInput(''); setDone([]);
+  };
   useEffect(() => genFamily(), []);
   const getSteps = (f: { a: number; b: number; p: number }) => [
     { label: `${f.b} × ${f.a} =`, answer: f.p },
@@ -817,9 +978,12 @@ const DivisionGame = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: (
   const [completed, setCompleted] = useState(0);
 
   const gen = () => {
-    const a = Math.floor(Math.random() * 9) + 2;          // Teiler 2–10
-    const b = Math.floor(Math.random() * 10) + 1;         // Ergebnis 1–10
-    const t = Math.floor(Math.random() * 3);               // Aufgabentyp
+    // Die Sperre ignoriert den Aufgabentyp: 63 : 7 zweimal hintereinander bleibt
+    // dieselbe Rechnung, auch wenn einmal der Teiler und einmal das Ergebnis fehlt.
+    const f = drawFresh('division-haus', 12,
+      () => ({ a: randInt(2, 10), b: randInt(1, 10), t: randInt(0, 2) }),
+      ({ a, b }) => `${a}/${b}`);
+    const { a, b, t } = f;
     setFam({ a, b, p: a * b, t });
     setStep(0); setInput(''); setDivSolved(false);
   };
@@ -1024,6 +1188,347 @@ const ZerlegeDivision = ({ onWin, onBack }: { onWin: (s: string) => void; onBack
   );
 };
 
+// ── Teilen mit Rest: Aufgabe eingeben, danach das Bild dazu ──
+// Gezeigt wird das AUFTEILEN: 23 : 7 heisst "wie oft passt 7 in 23?" — also
+// Rahmen zu je 7 Kaestchen. Die Zahl der Rahmen ist das Ergebnis, der letzte
+// Rahmen ist der Rest. Die andere Lesart (23 auf 7 Kinder verteilen) ergibt
+// dieselben Zahlen, aber ein Bild, in dem das Ergebnis nirgends abzuzaehlen ist.
+interface RestTask { n: number; d: number; q: number; r: number; }
+
+// Ergebnis hoechstens 6, damit das Bild nie mehr als sieben Zeilen hoch wird —
+// auf dem Handy muss es ohne Scrollen unter die Aufgabe passen.
+const rollRestTask = (): RestTask => {
+  const d = randInt(2, 9);
+  const q = randInt(2, 6);
+  const r = randInt(1, d - 1);   // nie 0: das Haus uebt genau den Rest
+  return { n: d * q + r, d, q, r };
+};
+
+const RestHaus = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () => void }) => {
+  const [task, setTask] = useState<RestTask | null>(null);
+  const [vals, setVals] = useState(['', '']);
+  const [done, setDone] = useState([false, false]);
+  const [wrong, setWrong] = useState([false, false]);
+  const [note, setNote] = useState('');        // Sonderhinweis, z.B. Rest zu gross
+  const [completed, setCompleted] = useState(0);
+  const [helped, setHelped] = useState(false);
+  const [helpReady, setHelpReady] = useState(false);
+  const [revealed, setRevealed] = useState(0); // wie viele Rahmen schon gezeichnet sind
+  const ref0 = useRef<HTMLInputElement>(null);
+  const ref1 = useRef<HTMLInputElement>(null);
+  const refs = [ref0, ref1];
+
+  const gen = () => {
+    const t = drawFresh('rest-haus', 10, rollRestTask, x => `${x.n}/${x.d}`);
+    setTask(t);
+    setVals(['', '']); setDone([false, false]); setWrong([false, false]);
+    setNote(''); setHelped(false); setHelpReady(false); setRevealed(0);
+    setTimeout(() => ref0.current?.focus(), 0);
+  };
+  useEffect(() => { gen(); }, []);
+
+  const solvedSelf = done[0] && done[1];
+  const showing = solvedSelf || helped;
+
+  // Der Hilfe-Knopf kommt erst nach 12 Sekunden — sonst ist er der bequemere Weg,
+  // bevor das Kind die Aufgabe ueberhaupt gelesen hat.
+  useEffect(() => {
+    if (!task || showing) return;
+    const id = window.setTimeout(() => setHelpReady(true), 12000);
+    return () => clearTimeout(id);
+  }, [task, showing]);
+
+  // Rahmen einzeln zeichnen, zuletzt der Rest.
+  useEffect(() => {
+    if (!showing || !task) return;
+    const ids = Array.from({ length: task.q + 1 }, (_, i) =>
+      window.setTimeout(() => setRevealed(i + 1), 380 * (i + 1)));
+    return () => ids.forEach(clearTimeout);
+  }, [showing, task]);
+
+  if (!task) return null;
+  const { n, d, q, r } = task;
+  const answers = [q, r];
+  const complete = revealed > q;              // Bild fertig gezeichnet
+
+  const type = (i: number, val: string) => {
+    if (done[i] || showing) return;
+    setVals(v => v.map((x, k) => (k === i ? val : x)));
+
+    const num = parseInt(val); if (isNaN(num)) return;
+
+    if (num === answers[i]) {
+      playSound('correct'); setNote('');
+      const nd = done.map((x, k) => (k === i ? true : x));
+      setDone(nd);
+      if (!nd[1 - i]) setTimeout(() => refs[1 - i].current?.focus(), 0);
+    } else if (val.length >= answers[i].toString().length) {
+      // Der haeufigste Fehler beim Teilen mit Rest ist ein Rest, der noch einmal
+      // durch den Teiler passt — den nennen wir beim Namen statt nur "falsch".
+      playSound('wrong');
+      setNote(i === 1 && num >= d ? `Der Rest muss kleiner als ${d} sein!` : '');
+      setHelpReady(true);
+      setWrong(w => w.map((x, k) => (k === i ? true : x)));
+      setTimeout(() => {
+        setVals(v => v.map((x, k) => (k === i ? '' : x)));
+        setWrong(w => w.map((x, k) => (k === i ? false : x)));
+        refs[i].current?.focus();
+      }, 450);
+    }
+  };
+
+  const next = () => {
+    // Aufgaben mit Hilfe zaehlen nicht mit — sonst waere der Sticker dreimal
+    // Knopfdruck weit.
+    if (helped) { gen(); return; }
+    setCompleted(c => c + 1);
+    if (completed + 1 >= 3) onWin('🍪');
+    else gen();
+  };
+
+  const field = (i: number) => (
+    <input
+      ref={refs[i]}
+      className={`rh-input ${done[i] ? 'done' : wrong[i] ? 'wrong' : ''} ${helped ? 'helped' : ''}`}
+      type="number"
+      value={helped ? String(answers[i]) : vals[i]}
+      readOnly={done[i] || showing}
+      onChange={e => type(i, e.target.value)}
+    />
+  );
+
+  return (
+    <div className="game-page" style={{ background: 'linear-gradient(160deg, #0097a728 0%, #f3fdff 100%)' }}>
+      <GameHeader category="division-rest" onBack={onBack} />
+      <div className="game-container rh-container" style={{ '--house-color': '#0097a7' } as any}>
+        <StarProgress solved={completed} total={3} />
+
+        <div className={`rh-task ${solvedSelf ? 'solved' : ''} ${helped ? 'helped' : ''}`}>
+          <span>{n} : {d} =</span>
+          {field(0)}
+          <span className="rh-restword">Rest</span>
+          {field(1)}
+        </div>
+
+        {showing && (
+          <div className="rh-boxes">
+            {Array.from({ length: q }, (_, g) => (
+              <div key={g} className={`rh-group ${revealed > g ? 'framed' : ''}`}>
+                {Array.from({ length: d }, (_, i) => <span key={i} className="rh-box" />)}
+                <span className="rh-num">{revealed > g ? g + 1 : ''}</span>
+              </div>
+            ))}
+            <div className={`rh-group rest ${complete ? 'framed' : ''}`}>
+              {Array.from({ length: r }, (_, i) => <span key={i} className="rh-box rest" />)}
+              <span className="rh-num">{complete ? `Rest ${r}` : ''}</span>
+            </div>
+          </div>
+        )}
+
+        {showing && complete && (
+          <div className="rh-probe">{q} × {d} = {q * d}, und {r} {r === 1 ? 'bleibt' : 'bleiben'} übrig — {q * d} + {r} = {n}</div>
+        )}
+
+        {showing
+          ? <button className="rh-next" onClick={next}>Weiter →</button>
+          : helpReady && (
+            <button className="rh-help" onClick={() => { setHelped(true); setNote(''); }}>
+              🔍 Zeig mir das Bild — ohne Stern
+            </button>
+          )}
+
+        <p className="div-hint">
+          {note ? <b className="rh-note">{note}</b>
+            : helped ? 'Mit Hilfe gelöst — diese Aufgabe zählt nicht. Die nächste schaffst du allein! 💪'
+            : solvedSelf ? `🎉 Zähle die Rahmen: ${q} Stück zu je ${d} — und ${r} ${r === 1 ? 'bleibt' : 'bleiben'} übrig.`
+            : `🍪 Wie oft passt ${d} in ${n}? Und was bleibt übrig?`}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ── Punkt vor Strich: erst entscheiden, dann rechnen ──
+// Das eigentliche Lernziel ist nicht das Rechnen, sondern die Reihenfolge.
+// Deshalb ist der erste Schritt keine Eingabe, sondern ein Antippen: welches
+// Rechenzeichen hat Vorfahrt? Wer nur zwei Zahlen ausrechnen muss, kann die
+// Regel umgehen, indem er stur von links nach rechts arbeitet — hier nicht.
+interface PvsTerm {
+  tokens: (number | string)[];  // z.B. [4, '+', 3, '×', 5]
+  opIdx: number;                // Index des Punkt-Zeichens: 1 (vorn) oder 3 (hinten)
+  v: number;                    // Wert des Punkt-Teils
+  result: number;
+}
+
+// Mal und Geteilt gemischt — sonst lernt das Kind "das × zuerst" statt der Regel.
+// Freies Wuerfeln reicht dafuer nicht: bei 40 % Geteilt besteht jede sechzehnte
+// 3er-Runde komplett aus Geteilt-Aufgaben, und das Haus wirkt dann wie ein
+// zweites Divisions-Haus. Deshalb folgt auf zwei Geteilt-Aufgaben immer ein Mal.
+//
+// Die Sperre gilt bewusst nur fuer Geteilt. Eine symmetrische Sperre ("nie mehr
+// als zwei gleiche") zieht eine ungleiche Mischung zwangslaeufig Richtung 50:50 —
+// gemessen kam Geteilt damit auf 38 %, obwohl nur 15 % gewuerfelt wurden.
+// So bleiben es die gewollten rund 32 % bei hoechstens zwei in Folge.
+const pvsLastOps: string[] = [];
+const pvsPointPart = (): { t: (number | string)[]; v: number } => {
+  const op = pvsLastOps[0] === ':' && pvsLastOps[1] === ':'
+    ? '×'
+    : (Math.random() < 0.35 ? ':' : '×');
+  pvsLastOps.unshift(op);
+  pvsLastOps.length = 2;
+
+  if (op === ':') {
+    const c = randInt(2, 9), q = randInt(2, 9);
+    return { t: [c * q, ':', c], v: q };
+  }
+  const b = randInt(2, 9), c = randInt(2, 9);
+  return { t: [b, '×', c], v: b * c };
+};
+
+const rollPvs = (): PvsTerm => {
+  const { t, v } = pvsPointPart();
+  const pointFirst = Math.random() < 0.5;   // steht der Punkt-Teil vorn oder hinten?
+  const plus = Math.random() < 0.55;
+
+  if (pointFirst) {
+    // v ist mindestens 2, a bleibt kleiner als v — das Ergebnis also positiv.
+    const a = plus ? randInt(2, Math.min(30, 100 - v)) : randInt(1, v - 1);
+    return { tokens: [...t, plus ? '+' : '−', a], opIdx: 1, v, result: plus ? v + a : v - a };
+  }
+  const a = plus ? randInt(2, Math.min(30, 100 - v)) : randInt(v + 1, Math.min(99, v + 30));
+  return { tokens: [a, plus ? '+' : '−', ...t], opIdx: 3, v, result: plus ? a + v : a - v };
+};
+
+const PunktVorStrich = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () => void }) => {
+  const [task, setTask] = useState<PvsTerm | null>(null);
+  const [step, setStep] = useState(0);     // 0 = Zeichen antippen, 1 = Punkt-Teil, 2 = Ergebnis
+  const [vals, setVals] = useState(['', '']);
+  const [wrong, setWrong] = useState(0);   // 0 = nichts, 1 = Auswahl, 2 = Eingabe
+  const [note, setNote] = useState('');
+  const [completed, setCompleted] = useState(0);
+  const advancing = useRef(false);
+  const ref1 = useRef<HTMLInputElement>(null);
+  const ref2 = useRef<HTMLInputElement>(null);
+
+  const gen = () => {
+    setTask(drawFresh('punkt-strich', 10, rollPvs, t => t.tokens.join('')));
+    setStep(0); setVals(['', '']); setWrong(0); setNote('');
+    advancing.current = false;
+  };
+  useEffect(() => { gen(); }, []);
+  if (!task) return null;
+
+  const { tokens, opIdx, v, result } = task;
+  const pointFirst = opIdx === 1;
+  const strichOp = tokens[pointFirst ? 3 : 1] as string;
+  const a = tokens[pointFirst ? 4 : 0] as number;
+
+  const pickOp = (i: number) => {
+    if (step !== 0) return;
+    if (i === opIdx) {
+      playSound('correct'); setNote('');
+      setStep(1);
+      setTimeout(() => ref1.current?.focus(), 0);
+    } else {
+      playSound('wrong');
+      setNote('🚦 Punkt vor Strich — Mal und Geteilt haben Vorfahrt!');
+      setWrong(1);
+      setTimeout(() => setWrong(0), 450);
+    }
+  };
+
+  const type = (i: number, val: string) => {
+    if (advancing.current) return;
+    setVals(p => p.map((x, k) => (k === i ? val : x)));
+    const num = parseInt(val); if (isNaN(num)) return;
+    const expected = i === 0 ? v : result;
+
+    if (num === expected) {
+      playSound('correct'); setNote('');
+      if (i === 0) {
+        setStep(2);
+        setTimeout(() => ref2.current?.focus(), 0);
+      } else {
+        advancing.current = true;
+        setTimeout(() => {
+          setCompleted(c => c + 1);
+          if (completed + 1 >= 3) onWin('🚦');
+          else gen();
+        }, 1300);                                  // Zeit, die fertige Zeile zu sehen
+      }
+    } else if (val.length >= expected.toString().length) {
+      playSound('wrong');
+      setWrong(2);
+      setTimeout(() => {
+        setVals(p => p.map((x, k) => (k === i ? '' : x)));
+        setWrong(0);
+        (i === 0 ? ref1 : ref2).current?.focus();
+      }, 450);
+    }
+  };
+
+  // Der Punkt-Teil bleibt als Block zusammen — nach der Auswahl wird er
+  // eingerahmt, damit sichtbar ist, welches Stueck gerade dran ist.
+  const partBlock = (
+    <span className={`pvs-part ${step > 0 ? 'chosen' : ''}`}>
+      {tokens[opIdx - 1]}
+      {step === 0
+        ? <button className="pvs-op" onClick={() => pickOp(opIdx)}>{tokens[opIdx]}</button>
+        : <span className="pvs-op-flat">{tokens[opIdx]}</span>}
+      {tokens[opIdx + 1]}
+    </span>
+  );
+  const strichBlock = step === 0
+    ? <button className="pvs-op" onClick={() => pickOp(pointFirst ? 3 : 1)}>{strichOp}</button>
+    : <span className="pvs-op-flat">{strichOp}</span>;
+
+  return (
+    <div className="game-page" style={{ background: 'linear-gradient(160deg, #3949ab28 0%, #f6f7ff 100%)' }}>
+      <GameHeader category="punkt-vor-strich" onBack={onBack} />
+      <div className="game-container" style={{ '--house-color': '#3949ab' } as any}>
+        <StarProgress solved={completed} total={3} />
+
+        <div className={`pvs-term ${wrong === 1 ? 'shake' : ''}`}>
+          {pointFirst
+            ? <>{partBlock}{strichBlock}<span>{a}</span></>
+            : <><span>{a}</span>{strichBlock}{partBlock}</>}
+        </div>
+
+        {step === 0 && <div className="pvs-ask">Welches Rechenzeichen ist zuerst dran?</div>}
+
+        {step >= 1 && (
+          <div className="pvs-rows">
+            <div className={`pvs-row ${step > 1 ? 'done' : wrong === 2 ? 'wrong' : 'active'}`}>
+              <span className="pvs-calc">{tokens[opIdx - 1]} {tokens[opIdx]} {tokens[opIdx + 1]} =</span>
+              <input ref={ref1} className="pvs-input" type="number"
+                value={step > 1 ? String(v) : vals[0]} readOnly={step > 1}
+                onChange={e => type(0, e.target.value)} />
+              {step > 1 && <span className="pvs-check">✓</span>}
+            </div>
+
+            {step >= 2 && (
+              <div className={`pvs-row ${vals[1] && parseInt(vals[1]) === result ? 'done' : wrong === 2 ? 'wrong' : 'active'}`}>
+                <span className="pvs-calc">
+                  {pointFirst ? <><b>{v}</b> {strichOp} {a} =</> : <>{a} {strichOp} <b>{v}</b> =</>}
+                </span>
+                <input ref={ref2} className="pvs-input" type="number" value={vals[1]}
+                  onChange={e => type(1, e.target.value)} />
+              </div>
+            )}
+          </div>
+        )}
+
+        <p className="div-hint">
+          {note ? <b className="pvs-note">{note}</b>
+            : step === 0 ? '🚦 Tippe das Zeichen an, das Vorfahrt hat'
+            : step === 1 ? 'Rechne zuerst den Punkt-Teil aus'
+            : 'Und jetzt der Rest — fast geschafft!'}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const MathGame = ({ category, performance, onAttempt, onWin, onBack }: { category: Category; performance: PerformanceData; onAttempt: (k: string, c: boolean) => void; onWin: (s: string) => void; onBack: () => void }) => {
   const [problem, setProblem] = useState(generateProblem(category, performance));
   const [input, setInput] = useState('');
@@ -1129,6 +1634,8 @@ export default function App() {
   // ── Game routing ──
   if (state.category === 'division')          return <DivisionGame onWin={onWin} onBack={onBack} />;
   if (state.category === 'division-zerlegen') return <ZerlegeDivision onWin={onWin} onBack={onBack} />;
+  if (state.category === 'division-rest')     return <RestHaus onWin={onWin} onBack={onBack} />;
+  if (state.category === 'punkt-vor-strich')  return <PunktVorStrich onWin={onWin} onBack={onBack} />;
   if (state.category === 'zahlen-fabrik')    return <FactoryGame onWin={onWin} onBack={onBack} />;
   if (state.category === 'meister-zelt')     return <ComparisonGame onWin={onWin} onBack={onBack} />;
   if (state.category === 'zahlen-mauer')     return <NumberWall onWin={onWin} onBack={onBack} />;
@@ -1147,11 +1654,14 @@ export default function App() {
 
       {/* header */}
       <div className="map-header">
-        <h1 className="village-title map-title" style={{ margin: 0 }}>
-          Julia's Mathe-Dorf 🏘️
-        </h1>
+        <div>
+          <h1 className="village-title map-title" style={{ margin: 0 }}>
+            Julia's Mathe-Dorf 🏘️
+          </h1>
+          <div className="map-subtitle">🐼 für die Panda-Klasse 3b</div>
+        </div>
         <div className="map-score-pill">
-          {currentTier ? currentTier.emoji : '🐣'}&nbsp;
+          {currentTier?.emoji ?? '🐼'}&nbsp;
           <Star size={14} fill="#f59e0b" stroke="none" style={{ verticalAlign: 'middle' }} />
           &nbsp;{totalStickers} Sticker
         </div>
@@ -1203,7 +1713,7 @@ export default function App() {
 
         {/* running animal along the main road */}
         <div className="map-runner">
-          <span>{currentTier ? currentTier.emoji : '🐣'}</span>
+          <span>{currentTier?.emoji ?? '🐼'}</span>
         </div>
       </div>
       </div>
