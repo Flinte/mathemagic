@@ -295,7 +295,6 @@ const PATH_SPECKS: [number, number, number, number, number, string][] = [
   [590, 184, 5, 3, 9, '#f3e7c6'], [660, 174, 4, 2.5, -7, '#cfb185'], [736, 174, 5, 3, 11, '#c7a878'],
   [826, 178, 4, 2.5, -6, '#f3e7c6'], [922, 202, 5, 3, 8, '#bda06f'],
   [976, 300, 5, 3, -9, '#cfb185'], [988, 366, 4, 2.5, 7, '#f3e7c6'], [990, 434, 5, 3, -12, '#c7a878'],
-  [978, 490, 4, 2.5, 6, '#bda06f'],
   [312, 452, 4, 2.5, -8, '#f3e7c6'], [302, 516, 5, 3, 10, '#cfb185'], [294, 578, 4, 2.5, -6, '#c7a878'],
 ];
 
@@ -304,8 +303,7 @@ const PATH_PLAZA = 'M 96 416 C 110 474, 124 538, 146 604';
 const PATH_SCHOOL = 'M 482 414 C 478 340, 470 264, 476 184';
 const PATH_EAST = 'M 542 192 C 624 180, 712 170, 778 176';
 const PATH_ADVENTURE = 'M 778 176 C 858 172, 928 196, 966 254';
-const PATH_RIGHT = 'M 966 254 C 984 344, 994 424, 980 508';
-const PATH_LAKE = 'M 980 508 C 970 546, 956 572, 940 592';
+const PATH_RIGHT = 'M 966 254 C 984 344, 992 420, 982 466';
 const PATH_SOUTH = 'M 318 408 C 310 480, 298 548, 292 618';
 
 // Alle Wege in einem Durchgang: erst die weiche Erdaura, dann die Wegfläche,
@@ -313,7 +311,7 @@ const PATH_SOUTH = 'M 318 408 C 310 480, 298 548, 292 618';
 const PATHS: { d: string; w: number }[] = [
   { d: MAIN_ROAD, w: 42 }, { d: PATH_PLAZA, w: 28 }, { d: PATH_SCHOOL, w: 30 },
   { d: PATH_EAST, w: 26 }, { d: PATH_ADVENTURE, w: 24 }, { d: PATH_RIGHT, w: 24 },
-  { d: PATH_LAKE, w: 20 }, { d: PATH_SOUTH, w: 18 },
+  { d: PATH_SOUTH, w: 18 },
 ];
 
 // Bambushain — das Zuhause des Pandas. Halme werden leicht unterschiedlich
@@ -501,7 +499,7 @@ const BUILDINGS: {
   { category: 'verdoppeln-halbieren', label: 'Spiegel-Haus',   icon: '🔄', color: '#66bb6a', roofColor: '#2e7d32', shape: 'barrel',   left: '13%', top: '79%' },
   // Zone 2 – Malviertel
   { category: 'einmaleins-klein',     label: '1×1 (bis 5)',    icon: '✖️', color: '#ab47bc', roofColor: '#6a1b9a', shape: 'cottage',  left: '37%', top: '25%' },
-  { category: 'einmaleins-gross',     label: '1×1 (bis 10)',   icon: '✖️', color: '#7b1fa2', roofColor: '#4a148c', shape: 'twostory', left: '48%', top: '17%' },
+  { category: 'einmaleins-gross',     label: '1×1 (bis 10)',   icon: '✖️', color: '#7b1fa2', roofColor: '#4a148c', shape: 'twostory', left: '48%', top: '21%' },
   { category: 'einmaleins-tafel',     label: '1×1 Tafel',      icon: '📋', color: '#e91e63', roofColor: '#880e4f', shape: 'workshop', left: '43%', top: '41%' },
   { category: 'division',             label: 'Divisions-Haus', icon: '➗', color: '#1e88e5', roofColor: '#0d47a1', shape: 'twostory', left: '58%', top: '22%' },
   { category: 'division-zerlegen',    label: 'Zerlege-Werkstatt', icon: '🧩', color: '#00897b', roofColor: '#004d40', shape: 'workshop', left: '64%', top: '38%' },
@@ -509,7 +507,7 @@ const BUILDINGS: {
   { category: 'kernaufgaben',         label: 'Kern-Trainer',   icon: '🔑', color: '#fb8c00', roofColor: '#e65100', shape: 'cottage',  left: '55%', top: '51%' },
   { category: 'tausch-arena',         label: 'Tausch-Arena',   icon: '🏡', color: '#43a047', roofColor: '#1b5e20', shape: 'barrel',   left: '45%', top: '62%' },
   // Zone 3 – Abenteuerviertel
-  { category: 'sachaufgaben',         label: 'Rechen-Post',    icon: '✉️', color: '#f4511e', roofColor: '#bf360c', shape: 'cottage',  left: '70%', top: '17%' },
+  { category: 'sachaufgaben',         label: 'Rechen-Post',    icon: '✉️', color: '#f4511e', roofColor: '#bf360c', shape: 'cottage',  left: '70%', top: '21%' },
   { category: 'platzhalter',          label: 'Rätsel-Höhle',   icon: '🔍', color: '#8d6e63', roofColor: '#4e342e', shape: 'tower',    left: '80%', top: '37%' },
   { category: 'punkt-vor-strich',    label: 'Vorfahrt-Haus',  icon: '🚦', color: '#3949ab', roofColor: '#1a237e', shape: 'twostory', left: '88%', top: '48%' },
   { category: 'zahlen-fabrik',        label: 'Zahlen-Fabrik',  icon: '⚙️', color: '#546e7a', roofColor: '#263238', shape: 'workshop', left: '74%', top: '57%' },
@@ -517,12 +515,6 @@ const BUILDINGS: {
   { category: 'meister-zelt',         label: 'Meister-Zelt',   icon: '🏆', color: '#ffca28', roofColor: '#f57f17', shape: 'tent',     left: '84%', top: '67%' },
   { category: 'differenz-jagd',       label: 'Differenz-See',  icon: '🌊', color: '#29b6f6', roofColor: '#01579b', shape: 'barrel',   left: '69%', top: '80%' },
   { category: 'zahlen-mauer',         label: 'Zahlen-Mauer',   icon: '🧱', color: '#a1887f', roofColor: '#4e342e', shape: 'twostory', left: '83%', top: '81%' },
-];
-
-const ZONE_SIGNS = [
-  { label: '🔢 Rechendorf',      left: '8%',  top: '42%' },
-  { label: '✖️ Malviertel',       left: '39%', top: '7%'  },
-  { label: '🎮 Abenteuerviertel', left: '73%', top: '7%'  },
 ];
 
 // ── Gezeichnete Häuser ──
@@ -1971,13 +1963,6 @@ export default function App() {
       <div className="map-pan" ref={panRef}>
       <div className="map-viewport">
         <MapTerrain />
-
-        {/* zone signs */}
-        {ZONE_SIGNS.map(z => (
-          <div key={z.label} className="map-zone-sign" style={{ left: z.left, top: z.top }}>
-            {z.label}
-          </div>
-        ))}
 
         {/* buildings */}
         {BUILDINGS.map(b => (

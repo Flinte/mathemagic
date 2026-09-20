@@ -835,22 +835,6 @@ body {
 }
 
 /* ── Zone sign labels ── */
-.map-zone-sign {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.9);
-  border-radius: 0.62cqw;
-  padding: 0.31cqw 0.92cqw;
-  font-size: max(9px, 0.84cqw);
-  font-weight: bold;
-  color: #444;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-  border: 2px solid rgba(0,0,0,0.07);
-  white-space: nowrap;
-  z-index: 15;
-  pointer-events: none;
-  letter-spacing: 0.3px;
-}
 
 /* ── CSS Trees ── */
 /* Bäume werden inzwischen im Gelände-SVG gezeichnet (MapTree in App.tsx) —
