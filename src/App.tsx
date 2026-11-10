@@ -10,6 +10,9 @@ import { useRoute } from './world/route';
 import { WorldMap } from './world/WorldMap';
 import { TownView } from './world/TownView';
 import { SchoolView } from './world/SchoolView';
+import { addResult, type TopicStats } from './world/lernstand';
+import { PandaStamp } from './ui/Panda';
+import type { Topic } from './games/zr1000/tasks';
 
 
 // --- Fokus ---
@@ -41,7 +44,8 @@ const DEFAULT_STICKERS: Record<Category, string[]> = {
 // Namen wechseln die Aufgabentexte durch, ohne die Rechnung zu aendern — das
 // hebt die gefuehlte Vielfalt der Rechen-Post deutlich, weil zwei Aufgaben mit
 // derselben Rechnung trotzdem verschieden aussehen.
-const NAMES = ['Lilly', 'Klaus', 'Mia', 'Jonas', 'Emma', 'Ben', 'Frieda', 'Paul', 'Nele', 'Ali', 'Sofia', 'Levi'];
+// Nur deutsche Vornamen — so wollte es Julias Vater.
+const NAMES = ['Lena', 'Klaus', 'Mia', 'Jonas', 'Emma', 'Ben', 'Frieda', 'Paul', 'Nele', 'Max', 'Anna', 'Lukas'];
 
 // Aufgaben-Vorlagen der Rechen-Post. Vorher waren es zwei — damit bestand jede
 // 3er-Runde zwangslaeufig aus zwei gleichen Aufgaben. Mal und Geteilt sind
@@ -74,6 +78,19 @@ const STORY_TEMPLATES: (() => { question: string[]; answer: number; key: string 
   () => { const n = pick(NAMES), tage = randInt(3, 7), pro = randInt(4, 9); return {
     question: [`${n} liest jeden Tag ${pro} Seiten.`, `Das macht ${n} ${tage} Tage lang.`, `Wie viele Seiten sind das?`],
     answer: tage * pro, key: 'story_lesen' }; },
+  // Zahlenraum bis 1000 — Sachaufgaben fuer die Mathearbeit am 17.11.2026
+  () => { const alle = randInt(25, 90) * 10, weg = randInt(3, 15) * 10 + randInt(0, 9); return {
+    question: [`An der Schule lernen ${alle} Kinder.`, `${weg} Kinder sind heute auf Klassenfahrt.`, `Wie viele Kinder sind in der Schule?`],
+    answer: alle - weg, key: 'story_schule' }; },
+  () => { const plaetze = randInt(3, 9) * 100, besetzt = randInt(100, plaetze - 20); return {
+    question: [`Ein Zug hat ${plaetze} Sitzplätze.`, `${besetzt} Plätze sind besetzt.`, `Wie viele Plätze sind noch frei?`],
+    answer: plaetze - besetzt, key: 'story_zug' }; },
+  () => { const n = pick(NAMES), hat = randInt(120, 480), neu = randInt(35, 260); return {
+    question: [`${n} sammelt Murmeln und hat schon ${hat} Stück.`, `Zum Geburtstag bekommt ${n} ${neu} dazu.`, `Wie viele Murmeln sind es jetzt?`],
+    answer: hat + neu, key: 'story_murmeln' }; },
+  () => { const weit = randInt(4, 9) * 100 + randInt(1, 9) * 10, schon = randInt(150, 380); return {
+    question: [`Familie Schmidt fährt ${weit} km in den Urlaub.`, `${schon} km sind sie schon gefahren.`, `Wie weit ist es noch?`],
+    answer: weit - schon, key: 'story_urlaub' }; },
 ];
 
 const rollProblem = (category: Category): any => {
@@ -1329,9 +1346,10 @@ export default function App() {
     stickers: Record<Category, string[]>;
     performance: PerformanceData;
     multiplicationGrid: Record<string, boolean>;
+    topicStats: TopicStats;
   }>(() => {
     const saved = localStorage.getItem('mathemagic-save');
-    const defaults = { stickers: DEFAULT_STICKERS, performance: {}, multiplicationGrid: {} };
+    const defaults = { stickers: DEFAULT_STICKERS, performance: {}, multiplicationGrid: {}, topicStats: {} };
     if (!saved) return defaults;
     // Aeltere Spielstaende enthalten noch `category` — das steht heute in der Adresse.
     try { const p = JSON.parse(saved); delete p.category; return { ...defaults, ...p, stickers: { ...DEFAULT_STICKERS, ...(p.stickers || {}) } }; }
@@ -1362,8 +1380,9 @@ export default function App() {
     setPendingWin(null);
     back();
   };
+  const onResult = (topic: Topic, ok: boolean) => setState(p => ({ ...p, topicStats: addResult(p.topicStats, topic, ok) }));
   const onMarkCell = (key: string) => setState(p => ({ ...p, multiplicationGrid: { ...p.multiplicationGrid, [key]: true } }));
-  const reset = () => { if (window.confirm('Spielstand wirklich zurücksetzen?')) { setState({ stickers: DEFAULT_STICKERS, performance: {}, multiplicationGrid: {} }); localStorage.removeItem('mathemagic-save'); } };
+  const reset = () => { if (window.confirm('Spielstand wirklich zurücksetzen?')) { setState({ stickers: DEFAULT_STICKERS, performance: {}, multiplicationGrid: {}, topicStats: {} }); localStorage.removeItem('mathemagic-save'); } };
 
   // ── Win screen ──
   if (pendingWin) {
@@ -1374,6 +1393,7 @@ export default function App() {
           <div className="win-sticker">{pendingWin.sticker}</div>
           <h2 className="win-title">Super gemacht! 🎉</h2>
           <p className="win-subtitle">{g.icon} {g.label}</p>
+          <PandaStamp text="Super!" />
           <button className="win-btn" onClick={saveWin}>Weiter →</button>
         </div>
       </div>
@@ -1394,12 +1414,12 @@ export default function App() {
   if (category === 'differenz-jagd')    return <DifferenceHunt key={category} onWin={onWin} onBack={onBack} />;
   if (category === 'einmaleins-tafel')  return <MultiplicationTafel key={category} grid={state.multiplicationGrid} onWin={onWin} onBack={onBack} onMarkCell={onMarkCell} />;
   if (category === 'tausch-arena')      return <TauschArena key={category} onWin={onWin} onBack={onBack} />;
-  if (category === 'probearbeit')       return <Probearbeit key={category} onWin={onWin} onBack={onBack} />;
-  if (category && category in GAME_TASKS) return <TaskGame key={category} game={category as TaskGameId} onWin={onWin} onBack={onBack} />;
+  if (category === 'probearbeit')       return <Probearbeit key={category} onWin={onWin} onBack={onBack} onResult={onResult} />;
+  if (category && category in GAME_TASKS) return <TaskGame key={category} game={category as TaskGameId} onWin={onWin} onBack={onBack} onResult={onResult} />;
   if (category)                         return <MathGame key={category} category={category} performance={state.performance} onAttempt={onAttempt} onWin={onWin} onBack={onBack} />;
 
   // ── Karte, Siedlung, Schule ──
-  if (route.screen === 'school') return <SchoolView stickers={state.stickers} onPlay={play} onBack={back} />;
+  if (route.screen === 'school') return <SchoolView stickers={state.stickers} topicStats={state.topicStats} onPlay={play} onBack={back} />;
   if (route.screen === 'town') {
     const town = TOWNS.find(t => t.id === route.town)!;
     return <TownView town={town} stickers={state.stickers} totalStickers={totalStickers} onPlay={play} onBack={back} />;

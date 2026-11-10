@@ -1862,3 +1862,111 @@ body.with-keypad .game-page {
 .tk-input.missing { border-bottom-color: #f59e0b; background: #fffbeb; animation: missingPulse 1s ease-in-out 2; }
 @keyframes missingPulse { 50% { box-shadow: 0 0 0 4px rgba(245,158,11,0.35); } }
 .tk-input.solution { border-bottom-color: #22c55e; color: #15803d; background: #dcfce7; }
+
+/* ======================================================
+   HEFT-LOOK — Rechenpapier, Kaestchen, Lehrerinnen-Lila
+   ====================================================== */
+:root { --ink: #1d4ed8; --teacher: #9333ea; --grid: #dbeafe; }
+.handwriting { font-family: 'Patrick Hand', 'Comic Sans MS', cursive; color: var(--ink); font-size: 1.25em; }
+
+/* Karierte Seite wie im Rechenheft (5-mm-Kaestchen) */
+.tk-card.heft {
+  background-color: #fff;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 22px 22px; background-position: -1px -1px;
+  border-radius: 6px; padding: 1.1rem clamp(0.6rem, 3vw, 1.4rem);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+.tk-head { display: flex; align-items: center; gap: 0.6rem; justify-content: center; width: 100%; }
+.tk-head .tk-prompt { flex: 1; }
+.teacher-mark { flex-shrink: 0; }
+
+/* Eingabe: jede Ziffer in ein Kaestchen, in blauer "Fueller"-Schrift */
+.tk-slot { display: inline-flex; align-items: center; gap: 4px; }
+.tk-input { border-bottom: none !important; background: transparent !important; box-shadow: none !important; padding: 0; gap: 3px; min-width: 0; }
+.num-box {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.05em; height: 1.3em; box-sizing: border-box;
+  border: 2px solid #94a3b8; border-radius: 4px; background: #fff;
+  font-family: 'Patrick Hand', 'Comic Sans MS', cursive; color: var(--ink); font-weight: 400;
+}
+.num-box.comma { width: 0.5em; border-color: transparent; background: transparent; }
+.num-box.empty { border-style: dashed; }
+.tk-input.num-active .num-box { border-color: #3b82f6; }
+.tk-input.num-active .num-box.empty { background: #eff6ff; }
+.tk-input.wrong .num-box { text-decoration: underline wavy var(--teacher); text-underline-offset: 4px; border-color: #c4b5fd; }
+.tk-input.missing .num-box { border-color: #f59e0b; background: #fffbeb; animation: missingPulse 1s ease-in-out 2; }
+.tk-input.solution .num-box { color: var(--teacher); border-color: #c4b5fd; }
+.tk-input.right .num-box { border-color: #a7f3d0; }
+.tk-correction { font-family: 'Patrick Hand', cursive; color: var(--teacher); font-size: 0.8em; transform: rotate(-4deg); }
+
+/* Rueckmeldungen */
+.tk-feedback.right { background: transparent; color: var(--teacher); font-family: 'Patrick Hand', cursive; font-size: 1.7rem; font-weight: 400; }
+.tk-feedback.reveal { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; color: #6b21a8; font-weight: 600; }
+.tk-feedback.reveal b { color: var(--teacher); }
+
+.panda-tip { display: flex; align-items: flex-end; gap: 0.5rem; max-width: 560px; text-align: left; }
+.panda-tip .panda-face { flex-shrink: 0; }
+.panda-bubble {
+  position: relative; background: #fff; border: 2px solid #1f2937; border-radius: 16px;
+  padding: 0.55rem 0.85rem; font-weight: 600; color: #1f2937; line-height: 1.35;
+}
+.panda-bubble::before {
+  content: ''; position: absolute; left: -10px; bottom: 12px;
+  border: 8px solid transparent; border-right-color: #1f2937;
+}
+
+.panda-stamp {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  transform: rotate(-7deg); color: var(--teacher);
+  font-family: 'Patrick Hand', cursive; font-size: 2rem; line-height: 1;
+}
+.win-card .panda-stamp { margin: 0.3rem 0 0.8rem; }
+
+/* ── Probearbeit als Arbeitsblatt ── */
+.exam-page { background: #e7e5e4; justify-content: flex-start; }
+.exam-sheet {
+  width: 100%; max-width: 780px; box-sizing: border-box;
+  background: #fff; padding: clamp(1rem, 4vw, 2.2rem);
+  box-shadow: 0 6px 22px rgba(0,0,0,0.18); margin-bottom: 1rem;
+  display: flex; flex-direction: column; gap: 0.2rem;
+}
+.exam-sheet-head { display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; align-items: baseline; font-weight: 600; color: #334155; border-bottom: 1px solid #cbd5e1; padding-bottom: 0.5rem; }
+.exam-sheet-head .handwriting { border-bottom: 1px solid #94a3b8; padding: 0 0.6rem; }
+.exam-code { margin-left: auto; border: 2px solid #1f2937; padding: 2px 10px; font-weight: 800; }
+.exam-title { margin: 0.8rem 0 0.4rem; font-size: clamp(1.1rem, 4.5vw, 1.45rem); color: #1f2937; }
+.exam-grade { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.6rem 0 0.9rem; }
+.exam-score { font-family: 'Patrick Hand', cursive; color: var(--teacher); font-size: 1.8rem; }
+
+.tk-card.sheet {
+  background-image: none; box-shadow: none; border-radius: 0;
+  border-bottom: 1px dashed #cbd5e1; align-items: flex-start; padding: 1rem 0;
+}
+.tk-card.sheet .tk-head { justify-content: flex-start; }
+.tk-card.sheet .tk-prompt { text-align: left; }
+.tk-card.sheet .tk-view, .tk-card.sheet .tk-choices, .tk-card.sheet .tk-order, .tk-card.sheet .place-table { align-self: center; }
+.tk-number { display: inline-flex; align-items: center; justify-content: center; width: 1.7rem; height: 1.7rem; border: 2px solid #1f2937; font-weight: 800; flex-shrink: 0; }
+.tk-choice.picked { border-color: var(--ink); background: #eff6ff; }
+.tk-teacher-note { margin: 0; align-self: center; font-family: 'Patrick Hand', cursive; color: var(--teacher); font-size: 1.25rem; }
+.exam-foot { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; padding-top: 1rem; }
+.exam-confirm { margin: 0; background: #fef9c3; color: #854d0e; border-radius: 10px; padding: 0.5rem 1rem; font-weight: 700; }
+.exam-hand-in { font-size: 1.25rem; padding: 0.75rem 2rem; }
+
+/* ── Lernstand: "Das kann ich schon" ── */
+.level-boxes { display: inline-flex; gap: 3px; margin-left: 0.6rem; vertical-align: middle; }
+.level-boxes span { width: 12px; height: 12px; border: 2px solid #94a3b8; border-radius: 2px; background: #fff; }
+.level-boxes span.filled { background: var(--teacher); border-color: var(--teacher); }
+.level-legend { margin: 1rem 0 0; color: #64748b; font-size: 0.85rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem; }
+.level-legend .level-boxes { margin-left: 0.4rem; }
+.topic-list li.today { background: #fef3c7; border-radius: 10px; padding: 0.4rem 0.6rem; margin-left: -0.6rem; }
+.topic-today { font-weight: 800; color: #b45309; font-size: 0.9rem; }
+
+/* Die Heftseite ist selbst die Karte — kein weisser Kasten drumherum. */
+.game-container.tk-container { background: transparent; box-shadow: none; padding: 0.5rem; border: none; }
+.tk-container .star-progress { background: rgba(255,255,255,0.85); border-radius: 999px; padding: 4px 12px; align-self: center; }
+
+.sound-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%; border: 2px solid #cbd5e1;
+  background: rgba(255,255,255,0.9); color: #475569; cursor: pointer; flex-shrink: 0;
+}

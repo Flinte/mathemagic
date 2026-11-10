@@ -1,4 +1,5 @@
 import type { GameId } from './games';
+import type { Topic } from '../games/zr1000/tasks';
 
 // Die Lernzettel der Klassenarbeiten, Wort fuer Wort wie von der Lehrerin.
 // Fuer eine neue Arbeit genuegt ein neuer Eintrag oben in der Liste — die
@@ -6,6 +7,8 @@ import type { GameId } from './games';
 export interface ExamTopic {
   text: string;
   games: GameId[];
+  // Welche Aufgaben-Themen dazu zaehlen — daraus fuellt sich "Das kann ich schon".
+  topics?: Topic[];
 }
 
 export interface Exam {
@@ -17,15 +20,15 @@ export const EXAMS: Exam[] = [
   {
     date: '2026-11-17',
     topics: [
-      { text: 'Zahlen in der Stellenwertschreibweise erkennen, Geheimschrift', games: ['stellenwert'] },
-      { text: 'Plättchen in der Stellenwerttafel', games: ['stellenwert'] },
-      { text: 'Ausschnitte aus dem Tausenderstreifen', games: ['tausender-streifen'] },
-      { text: 'Zahlenfolgen, Zahlwörter', games: ['tausender-streifen', 'stellenwert'] },
-      { text: 'Zahlenstrahl', games: ['zahlenstrahl'] },
-      { text: 'Nachfolger, Vorgänger', games: ['tausender-streifen'] },
-      { text: 'Nachbarzehner, Nachbarhunderter', games: ['runden'] },
-      { text: 'Runden auf Zehner, auf Hunderter', games: ['runden'] },
-      { text: 'Geld (auch die Kommaschreibweise), Sachaufgaben', games: ['geld', 'sachaufgaben'] },
+      { text: 'Zahlen in der Stellenwertschreibweise erkennen, Geheimschrift', games: ['stellenwert'], topics: ['stellenwert'] },
+      { text: 'Plättchen in der Stellenwerttafel', games: ['stellenwert'], topics: ['plaettchen'] },
+      { text: 'Ausschnitte aus dem Tausenderstreifen', games: ['tausender-streifen'], topics: ['streifen'] },
+      { text: 'Zahlenfolgen, Zahlwörter', games: ['tausender-streifen', 'stellenwert'], topics: ['folgen', 'zahlwort'] },
+      { text: 'Zahlenstrahl', games: ['zahlenstrahl'], topics: ['strahl'] },
+      { text: 'Nachfolger, Vorgänger', games: ['tausender-streifen'], topics: ['nachfolger'] },
+      { text: 'Nachbarzehner, Nachbarhunderter', games: ['runden'], topics: ['nachbarn'] },
+      { text: 'Runden auf Zehner, auf Hunderter', games: ['runden'], topics: ['runden'] },
+      { text: 'Geld (auch die Kommaschreibweise), Sachaufgaben', games: ['geld', 'sachaufgaben'], topics: ['geld'] },
     ],
   },
   {

@@ -57,6 +57,13 @@ export const keypad = {
     active = f;
     emit();
   },
+  // Zum naechsten beschreibbaren Feld (Reihenfolge wie auf dem Bildschirm) —
+  // auf dem Probearbeits-Blatt bringt ✓ so von Aufgabe zu Aufgabe.
+  focusNext() {
+    const from = active ? fields.findIndex(f => f.id === active!.id) : -1;
+    const next = fields.slice(from + 1).find(f => f.canFocus());
+    if (next) { active = next; emit(); }
+  },
   press(key: Key) {
     // Ist gerade nichts aktiv, nimmt das erste beschreibbare Feld die Taste.
     // ✓ braucht kein beschreibbares Feld: es landet notfalls beim ersten Feld.

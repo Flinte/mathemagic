@@ -12,6 +12,8 @@ interface Props {
   autoFocus?: boolean;
   allowComma?: boolean;
   maxLength?: number;
+  // Jede Ziffer in ein eigenes Kaestchen — wie im Rechenheft.
+  boxes?: boolean;
   className?: string;
   style?: React.CSSProperties;
   ref?: React.Ref<NumInputHandle>;
@@ -25,7 +27,7 @@ let nextId = 1;
 // Aufklappen jedes Mal das ganze Bild nach oben.
 export const NumInput = ({
   value, onChange, onSubmit, readOnly = false, autoFocus = false, allowComma = false,
-  maxLength = 5, className = '', style, ref,
+  maxLength = 5, boxes = false, className = '', style, ref,
 }: Props) => {
   const [id] = useState(() => nextId++);
   const { activeId } = useKeypad();
@@ -70,16 +72,31 @@ export const NumInput = ({
   useImperativeHandle(ref, () => ({ focus: () => keypad.focus(id) }), [id]);
 
   const active = activeId === id && !readOnly;
+
+  // Wird ein Feld aktiv, das hinter dem Ziffernblock oder ausserhalb des
+  // Bildes liegt (lange Probearbeit), rollt die Seite es in die Mitte.
+  const el = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!active || !el.current) return;
+    const r = el.current.getBoundingClientRect();
+    if (r.top < 70 || r.bottom > window.innerHeight * 0.6) el.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [active]);
+
   return (
     <span
+      ref={el}
       role="textbox"
       aria-readonly={readOnly}
       className={`num-input ${className} ${active ? 'num-active' : ''}`}
       style={style}
       onClick={() => keypad.focus(id)}
     >
-      {value}
-      {active && <span className="num-caret" />}
+      {boxes
+        ? <>
+            {[...value].map((ch, i) => <span key={i} className={`num-box ${ch === ',' ? 'comma' : ''}`}>{ch}</span>)}
+            {(active || value === '') && <span className="num-box empty">{active && <span className="num-caret" />}</span>}
+          </>
+        : <>{value}{active && <span className="num-caret" />}</>}
     </span>
   );
 };

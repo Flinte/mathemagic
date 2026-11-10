@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Star, Trash2 } from 'lucide-react';
+import { Star, Trash2, Volume2, VolumeX } from 'lucide-react';
+import { isSoundOn, setSoundOn } from '../games/shared';
 import { IsoScene } from '../iso/IsoScene';
 import { TOWNS, type TownId } from './towns';
 import { currentAnimal } from './islands';
@@ -24,6 +25,9 @@ export const WorldMap = ({ stickers, onOpenTown, onOpenSchool, onReset }: Props)
   const total = Object.values(stickers).flat().length;
   const exam = nextExam();
   const days = exam ? daysUntil(exam) : 0;
+
+  const [sound, setSound] = useState(isSoundOn);
+  const toggleSound = () => { setSoundOn(!sound); setSound(!sound); };
 
   const frameRef = useRef<HTMLDivElement>(null);
   const [aspect, setAspect] = useState(0);
@@ -52,6 +56,9 @@ export const WorldMap = ({ stickers, onOpenTown, onOpenSchool, onReset }: Props)
           <Star size={14} fill="#f59e0b" stroke="none" style={{ verticalAlign: 'middle' }} />
           &nbsp;{total} Sticker
         </div>
+        <button className="sound-btn" onClick={toggleSound} aria-label={sound ? 'Ton ausschalten' : 'Ton einschalten'} title={sound ? 'Ton aus' : 'Ton an'}>
+          {sound ? <Volume2 size={18} /> : <VolumeX size={18} />}
+        </button>
         <button className="reset-btn world-reset" onClick={onReset} aria-label="Spielstand zurücksetzen"><Trash2 size={14} /></button>
       </header>
 

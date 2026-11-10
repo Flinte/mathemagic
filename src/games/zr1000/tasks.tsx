@@ -356,7 +356,8 @@ const muenzenZaehlen = (): Task => {
 };
 
 const THINGS = ['ein Heft', 'einen Bleistift', 'ein Lineal', 'einen Radiergummi', 'eine Brezel', 'ein Eis', 'einen Apfel', 'einen Malkasten', 'ein Buch', 'eine Mappe'];
-const NAMES = ['Julia', 'Lilly', 'Mia', 'Ben', 'Emma', 'Paul', 'Nele', 'Ali', 'Sofia', 'Levi'];
+// Nur deutsche Vornamen.
+const NAMES = ['Julia', 'Lena', 'Mia', 'Ben', 'Emma', 'Paul', 'Nele', 'Max', 'Anna', 'Lukas'];
 const price = () => randInt(6, 199) * 5;   // 0,30 € bis 9,95 €, auf 5 ct
 
 const einkauf = (): Task => {

@@ -51,7 +51,17 @@ const getAudioCtx = () => {
   return audioCtx;
 };
 
+// Ton an/aus — gilt fuer das Geraet und bleibt nach dem Neuladen erhalten.
+const SOUND_KEY = 'mathemagic-sound';
+let soundOn = (() => { try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch { return true; } })();
+export const isSoundOn = () => soundOn;
+export const setSoundOn = (on: boolean) => {
+  soundOn = on;
+  try { localStorage.setItem(SOUND_KEY, on ? 'on' : 'off'); } catch { /* privater Modus */ }
+};
+
 export const playSound = (type: 'correct' | 'wrong') => {
+  if (!soundOn) return;
   try {
     const ctx = getAudioCtx();
     const osc = ctx.createOscillator();
