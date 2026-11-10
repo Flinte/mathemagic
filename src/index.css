@@ -1705,14 +1705,22 @@ body.with-keypad .game-page {
   padding-bottom: calc(var(--kp-height) + 12px);
 }
 
+/* Quer: Spalte rechts. Die Tasten bekommen eine feste, fast quadratische
+   Groesse aus der verfuegbaren Hoehe — mit 1fr wurden sie ueber die ganze
+   Hoehe gezogen und standen hoch und schmal da. */
 @media (orientation: landscape) {
+  :root {
+    --kp-lkey: clamp(40px, calc((100svh - 58px - 2 * var(--kp-pad) - 4 * var(--kp-gap)) / (var(--kp-rows, 4) + 0.6)), 80px);
+    --kp-width: calc(3 * var(--kp-lkey) * 1.15 + 2 * var(--kp-gap) + 2 * var(--kp-pad));
+  }
   .keypad {
     left: auto; top: 58px; max-width: none; margin: 0;
     width: var(--kp-width); box-sizing: border-box;
-    grid-auto-rows: 1fr; align-content: stretch;
+    grid-auto-rows: var(--kp-lkey); align-content: center;
     border-radius: 18px 0 0 0;
     box-shadow: -4px 0 18px rgba(0,0,0,0.15);
   }
+  .kp-key { font-size: calc(var(--kp-lkey) * 0.45); }
   body.with-keypad .game-page { padding-bottom: 0.75rem; padding-right: calc(var(--kp-width) + 0.5rem); }
 }
 
