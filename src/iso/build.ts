@@ -8,7 +8,8 @@ import { LL, LR, UL, UR, pathTile, type Dir } from './tiles';
 //   o  Wasser               t  Wiese mit Baum
 //   T  Wiese mit Baumgruppe b  Wiese mit Busch d  Erde
 //   x  Wiese mit Baugeruest   w  Weizenfeld     W  Brunnen
-//   P  grosse Kiefer
+//   P  grosse Kiefer          f  Acker (gruen)  F  Acker (gepfluegt)
+//   R  Felsen                 H  Bauplatz (Haus kommt aus der Hausliste)
 export interface House {
   c: number; r: number;
   // Stockwerke von unten nach oben, ohne Richtungs-Endung, z. B. 'building_doorWindows'.
@@ -83,6 +84,9 @@ export const buildCells = (cells: Cells, houses: House[] = [], stilts = true): P
     if (ch === 'b') put('rocks_grass_N', h + 1);
     if (ch === 'x') put('structure_low_N', h + 1);
     if (ch === 'w') put('furrow_cropWheat_N', h + 1);
+    if (ch === 'f') put('furrow_crop_N', h + 1);
+    if (ch === 'F') put('furrow_N', h + 1);
+    if (ch === 'R') put('rocks_dirt_N', h + 1);
     if (ch === 'W') put('well_E', h + 1);
     if (ch === 'P') put('tree_pineLarge_N', h + 1);
 

@@ -433,5 +433,11 @@ const toCents = (s: string) => {
   const [e, c = ''] = s.split(',');
   return Number(e || 0) * 100 + Number((c + '00').slice(0, 2));
 };
+// Euro-Betraege muessen voll ausgeschrieben sein: 0,50 € — nicht 0,5 und nicht 5.
+// So wird die Kommaschreibweise mitgeuebt.
+const EURO = /^\d+,\d\d$/;
 export const isRight = (input: string, answer: string, comma = false) =>
-  input !== '' && (comma ? toCents(input) === toCents(answer) : Number(input) === Number(answer));
+  input !== '' && (comma ? EURO.test(input) && toCents(input) === toCents(answer) : Number(input) === Number(answer));
+// Richtiger Betrag, nur nicht voll ausgeschrieben (0,5 statt 0,50)?
+export const isShortEuro = (input: string, answer: string) =>
+  input !== '' && !EURO.test(input) && toCents(input) === toCents(answer);

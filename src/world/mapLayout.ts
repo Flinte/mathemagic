@@ -59,6 +59,20 @@ const noise = (c: number, r: number) => {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 };
 
+// Weicher Zufall: benachbarte Felder haben aehnliche Werte. Daraus entstehen
+// zusammenhaengende Waelder und Huegel statt verstreuter Einzelbaeume.
+const smooth = (c: number, r: number, size: number, seed: number) => {
+  const gc = Math.floor(c / size), gr = Math.floor(r / size);
+  const fc = c / size - gc, fr = r / size - gr;
+  const at = (x: number, y: number) => noise(x * 31 + seed * 101, y * 17 + seed * 7);
+  const top = at(gc, gr) * (1 - fc) + at(gc + 1, gr) * fc;
+  const bottom = at(gc, gr + 1) * (1 - fc) + at(gc + 1, gr + 1) * fc;
+  return top * (1 - fr) + bottom * fr;
+};
+
+// Auswahl aus einer Liste mit festem Zufallswert n (0 bis 1)
+const pick = <T,>(list: readonly T[], n: number): T => list[Math.min(list.length - 1, Math.floor(n * list.length))];
+
 // Kuerzester Weg ueber freie Wiese, Abbiegen kostet extra — sonst entstehen
 // Treppen-Wege mit einer Kurve auf jedem Feld.
 const route = (free: (c: number, r: number) => boolean, from: [number, number], to: [number, number]) => {
@@ -158,11 +172,47 @@ const build = (kind: LayoutKind, aspect: number): MapLayout => {
     feet.push(t.foot);
   }
 
-  // 4. Wege: jede Stadt an die naechste schon verbundene (wie ein Spannbaum)
-  const isRamp = (c: number, r: number) => !!cells.get(cellKey(c, r))?.ramp;
-  const free = (c: number, r: number) => {
+  // 3b. Landschaft zwischen den Staedten: Huegel, Felder, kleine Weiler.
+  // Alles mit Abstand zu den Staedten, damit Rampen und Wege Platz haben.
+  const flatMeadow = (c: number, r: number) => {
     const cell = cells.get(cellKey(c, r));
-    return !!cell && cell.h === 0 && cell.ch !== 'o' && !cell.ramp && !inTown(c, r)
+    return !!cell && cell.h === 0 && cell.ch === 'g' && inner(c, r) && townDist(c, r) >= 3;
+  };
+  // Huegel: zusammenhaengende Flaechen eine Stufe hoch
+  for (const [k, cell] of cells) {
+    const [c, r] = k.split(',').map(Number);
+    if (cell.ch === 'g' && cell.h === 0 && townDist(c, r) >= 4 && inner(c, r) && smooth(c, r, 7, 11) > 0.7) cell.h = 1;
+  }
+  // Felder: Rechtecke mit Furchen — gruen bepflanzt, Weizen oder frisch gepfluegt
+  for (const k of [...cells.keys()]) {
+    const [c, r] = k.split(',').map(Number);
+    if (noise(c * 5 + 3, r * 11 + 7) > 0.012 || !flatMeadow(c, r)) continue;
+    const kind = pick(['f', 'w', 'F'], noise(c, r * 3));
+    const w = 3 + Math.floor(noise(c + 9, r) * 2), d = 2 + Math.floor(noise(c, r + 9) * 3);
+    for (let dc = 0; dc < w; dc++) for (let dr = 0; dr < d; dr++) {
+      if (flatMeadow(c + dc, r + dr)) cells.get(cellKey(c + dc, r + dr))!.ch = kind;
+    }
+  }
+  // Weiler: zwei, drei Haeuschen mit bunten Daechern
+  const hamlet: [number, number][] = [];
+  for (const k of [...cells.keys()]) {
+    const [c, r] = k.split(',').map(Number);
+    if (noise(c * 7 + 1, r * 13 + 5) > 0.006 || townDist(c, r) < 4) continue;
+    for (const [dc, dr] of [[0, 0], [2, 0], [0, 2]].slice(0, 2 + Math.floor(noise(c, r + 5) * 2))) {
+      if (!flatMeadow(c + dc, r + dr)) continue;
+      cells.get(cellKey(c + dc, r + dr))!.ch = 'H';
+      hamlet.push([c + dc, r + dr]);
+    }
+  }
+
+  // 4. Wege: jede Stadt an die naechste schon verbundene (wie ein Spannbaum).
+  // Gegangen wird ueber Wiese; nur wenn es gar nicht anders geht, auch ueber
+  // ein Feld (nie durch Haeuser, Wasser oder Huegel).
+  const isRamp = (c: number, r: number) => !!cells.get(cellKey(c, r))?.ramp;
+  const passable = (c: number, r: number, overFields: boolean) => {
+    const cell = cells.get(cellKey(c, r));
+    return !!cell && cell.h === 0 && !cell.ramp && !inTown(c, r)
+      && (cell.ch === 'g' || cell.ch === 'p' || (overFields && 'fwF'.includes(cell.ch)))
       // nicht seitlich an einer Rampe vorbei — sonst haengt der Weg an der Rampe fest
       && !isRamp(c - 1, r) && !isRamp(c + 1, r);
   };
@@ -176,21 +226,36 @@ const build = (kind: LayoutKind, aspect: number): MapLayout => {
       if (d < bestD) { bestD = d; bestPair = [a, b]; }
     });
     const [a, b] = bestPair;
-    for (const [c, r] of route(free, feet[b], feet[a])) cells.set(cellKey(c, r), { ch: 'p', h: 0 });
+    let way = route((c, r) => passable(c, r, false), feet[b], feet[a]);
+    if (way.length === 0) way = route((c, r) => passable(c, r, true), feet[b], feet[a]);
+    for (const [c, r] of way) cells.set(cellKey(c, r), { ch: 'p', h: 0 });
     linked.push(b);
   }
 
-  // 5. Baeume und Buesche auf der freien Wiese
+  // Haeuser der Weiler (nur wo noch Bauplatz ist)
+  const ROOFS = ['roof_gableBrown', 'roof_gableGreen', 'roof_gablePurple', 'roof_gableBeige', 'roof_slantBrown', 'roof_roundedGreen'];
+  for (const [c, r] of hamlet) {
+    if (cells.get(cellKey(c, r))?.ch !== 'H') continue;
+    const n = noise(c * 3, r * 5);
+    houses.push({ c, r, floors: [n < 0.5 ? 'building_doorWindows' : 'building_doorWindowsBeige'], roof: pick(ROOFS, noise(r, c)), dir: n < 0.25 || n > 0.75 ? 'N' : 'E' });
+  }
+
+  // 5. Baeume: Waelder dicht beieinander, sonst nur hier und da ein Baum,
+  // ein Busch oder ein Felsen. Auf Huegeln wachsen vor allem Kiefern.
   for (const [k, cell] of cells) {
-    if (cell.h !== 0 || cell.ch !== 'g') continue;
+    if (cell.ch !== 'g' || inTown(...(k.split(',').map(Number) as [number, number]))) continue;
     const [c, r] = k.split(',').map(Number);
-    const nearPath = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => cells.get(cellKey(c + dc, r + dr))?.ch === 'p');
     // Direkt am Plateau keine Baeume, sonst verschwindet die Stadtkante dahinter.
     if (townDist(c, r) <= 1) continue;
+    const nearPath = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => cells.get(cellKey(c + dc, r + dr))?.ch === 'p');
     const n = noise(c, r);
-    if (n < 0.07) cell.ch = 't';
-    else if (n < 0.1 && !nearPath) cell.ch = 'T';
-    else if (n < 0.13) cell.ch = 'b';
+    const forest = smooth(c, r, 6, 3) > 0.62;
+    if (cell.h > 0) cell.ch = n < 0.45 ? 'P' : n < 0.6 ? 'T' : n < 0.66 ? 'R' : 'g';
+    else if (forest && !nearPath) cell.ch = n < 0.3 ? 'T' : n < 0.5 ? 'P' : n < 0.65 ? 't' : 'g';
+    else if (n < 0.05) cell.ch = 't';
+    else if (n < 0.07 && !nearPath) cell.ch = 'T';
+    else if (n < 0.1) cell.ch = 'b';
+    else if (n < 0.115) cell.ch = 'R';
   }
 
   const animals = ANIMALS.map(a => {

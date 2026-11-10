@@ -6,7 +6,7 @@ import { NumInput, type NumInputHandle } from '../../ui/NumInput';
 import { keypad } from '../../ui/keypadStore';
 import { PandaStamp, PandaTip, TeacherCheck, TeacherCross } from '../../ui/Panda';
 import { PlaceTable } from './visuals';
-import { EXAM_PLAN, GAME_TASKS, isRight, type Task, type TaskGameId, type Topic } from './tasks';
+import { EXAM_PLAN, GAME_TASKS, isRight, isShortEuro, type Task, type TaskGameId, type Topic } from './tasks';
 
 // Meldet nach jeder Aufgabe, ob sie beim ersten Versuch geklappt hat — daraus
 // waechst der Lernstand je Thema in der Schule.
@@ -41,6 +41,7 @@ const TaskCard = ({ task, mode, onDone, graded = false, onStatus, number }: Card
   const [phase, setPhase] = useState<Phase>('ask');
   const [showHint, setShowHint] = useState(false);
   const [missing, setMissing] = useState(false);
+  const [shortEuro, setShortEuro] = useState(false);   // 0,5 statt 0,50 getippt
   const [picked, setPicked] = useState<number[]>([]);         // Auswahl bzw. Reihenfolge
   const [counts, setCounts] = useState<[number, number, number]>([0, 0, 0]);
   const [shake, setShake] = useState(-1);
@@ -93,6 +94,7 @@ const TaskCard = ({ task, mode, onDone, graded = false, onStatus, number }: Card
   const evaluate = (vs: string[]) => {
     const ok = task.answers!.map((a, i) => isRight(vs[i], a, task.comma));
     setMissing(false);
+    setShortEuro(!!task.comma && task.answers!.some((a, i) => isShortEuro(vs[i], a)));
     setMarks(ok.map(o => (o ? 'right' : 'wrong')));
     if (ok.every(Boolean)) { right(); return; }
     if (!wrong()) refs.current[ok.indexOf(false)]?.focus();
@@ -274,7 +276,9 @@ const TaskCard = ({ task, mode, onDone, graded = false, onStatus, number }: Card
         <div className="tk-feedback-area">
           {phase === 'right' && <div className="tk-feedback right">Richtig! 🎉</div>}
           {phase === 'ask' && missing && <div className="tk-feedback hint">Es fehlt noch eine Zahl. ✏️</div>}
-          {phase === 'ask' && !missing && tries === 1 && <div className="tk-feedback hint">Nicht ganz — {n > 0 ? 'die unterstrichenen Zahlen stimmen noch nicht.' : 'versuch es noch einmal.'}</div>}
+          {phase === 'ask' && !missing && tries === 1 && (shortEuro
+            ? <div className="tk-feedback hint">Fast! Bei Euro schreibt man immer zwei Ziffern nach dem Komma: 0,50 € statt 0,5 €.</div>
+            : <div className="tk-feedback hint">Nicht ganz — {n > 0 ? 'die unterstrichenen Zahlen stimmen noch nicht.' : 'versuch es noch einmal.'}</div>)}
           {phase === 'ask' && showHint && <PandaTip>{task.hint}</PandaTip>}
           {phase === 'reveal' && (
             <div className="tk-feedback reveal">
