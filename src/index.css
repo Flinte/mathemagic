@@ -901,8 +901,8 @@ body {
   color: inherit;
   outline: none;
 }
-.zl-input:focus { background: #fff; box-shadow: 0 3px 10px rgba(0,137,123,0.25); }
-.zl-input:read-only { border-bottom-color: transparent; background: transparent; }
+.zl-input.num-active { background: #fff; box-shadow: 0 3px 10px rgba(0,137,123,0.25); }
+.zl-input[aria-readonly="true"] { border-bottom-color: transparent; background: transparent; }
 
 /* Pfeiltasten des Zahlenfeldes ausblenden — verleiten nur zum Raten */
 .zl-input::-webkit-outer-spin-button,
@@ -1132,7 +1132,7 @@ body {
   color: inherit;
   outline: none;
 }
-.rh-input:focus { background: #fff; box-shadow: 0 3px 10px rgba(0,151,167,0.25); }
+.rh-input.num-active { background: #fff; box-shadow: 0 3px 10px rgba(0,151,167,0.25); }
 .rh-input.done   { border-bottom-color: #66bb6a; color: #2e7d32; }
 .rh-input.helped { border-bottom-color: #b0bec5; color: #78909c; }
 .rh-input.wrong  { border-bottom-color: #ef5350; color: #c62828; animation: zlShake 0.35s; }
@@ -1338,8 +1338,8 @@ body {
   color: inherit;
   outline: none;
 }
-.pvs-input:focus { background: #fff; box-shadow: 0 3px 10px rgba(57,73,171,0.25); }
-.pvs-input:read-only { border-bottom-color: transparent; background: transparent; }
+.pvs-input.num-active { background: #fff; box-shadow: 0 3px 10px rgba(57,73,171,0.25); }
+.pvs-input[aria-readonly="true"] { border-bottom-color: transparent; background: transparent; }
 .pvs-input::-webkit-outer-spin-button,
 .pvs-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .pvs-input { -moz-appearance: textfield; appearance: textfield; }
@@ -1405,7 +1405,7 @@ body {
   outline: none;
 }
 .uhr-input.wide { width: 3.6ch; }
-.uhr-input:focus { background: #fff; box-shadow: 0 3px 10px rgba(109,76,65,0.25); }
+.uhr-input.num-active { background: #fff; box-shadow: 0 3px 10px rgba(109,76,65,0.25); }
 .uhr-input.done  { border-bottom-color: #66bb6a; color: #2e7d32; }
 .uhr-input.wrong { border-bottom-color: #ef5350; color: #c62828; animation: zlShake 0.35s; }
 .uhr-input::-webkit-outer-spin-button,
@@ -1644,4 +1644,81 @@ body {
 @media (orientation: landscape) and (max-height: 500px) {
   .world-subtitle { display: none; }
   .world-title { font-size: 1.1rem; border-width: 2px; }
+}
+
+/* ── Zahlenfelder und Ziffernblock ──
+   Die Felder sind <span>s, keine <input>s — so klappt nie die Handy-Tastatur
+   auf. Aussehen wie bisher ueber die Klassen der Spiele (.input-field,
+   .zl-input, …); hier nur, was ein <input> von Haus aus mitbrachte. */
+.num-input {
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle; box-sizing: content-box;
+  min-height: 1.15em; line-height: 1.15; white-space: nowrap;
+  cursor: pointer; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.input-field.num-input { padding: 4px 8px; background: white; }
+.input-field.num-active { box-shadow: 0 0 0 4px rgba(255,255,255,0.9), 0 0 0 7px var(--house-color, #1e88e5); }
+.brick-input.num-active { box-shadow: inset 0 0 0 3px #1e88e5; }
+.num-caret {
+  display: inline-block; width: 3px; height: 0.85em; margin-left: 2px;
+  background: currentColor; border-radius: 2px;
+  animation: caretBlink 1s steps(1) infinite;
+}
+@keyframes caretBlink { 50% { opacity: 0; } }
+
+/* Groesse des Blocks: vier Tastenreihen. Hochkant unten, quer rechts. */
+:root {
+  --kp-key: clamp(46px, 7.2svh, 68px);
+  --kp-gap: 7px;
+  --kp-pad: 9px;
+  --kp-height: calc(4 * var(--kp-key) + 3 * var(--kp-gap) + 2 * var(--kp-pad) + env(safe-area-inset-bottom));
+  --kp-width: clamp(190px, 30vw, 300px);
+}
+.keypad {
+  position: fixed; z-index: 900;
+  left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 560px;
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: var(--kp-key);
+  gap: var(--kp-gap);
+  padding: var(--kp-pad) var(--kp-pad) calc(var(--kp-pad) + env(safe-area-inset-bottom));
+  background: rgba(255,255,255,0.94); backdrop-filter: blur(8px);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -4px 18px rgba(0,0,0,0.15);
+  touch-action: manipulation;
+}
+.kp-key {
+  border: none; border-radius: 14px;
+  background: #f1f5f9; color: #1f2937;
+  font: inherit; font-size: clamp(1.4rem, 4.5svh, 2rem); font-weight: 700;
+  box-shadow: 0 3px 0 #cbd5e1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+  transition: transform 0.05s, box-shadow 0.05s;
+}
+.kp-key:active { transform: translateY(3px); box-shadow: 0 0 0 #cbd5e1; background: #e2e8f0; }
+.kp-back { background: #fee2e2; color: #b91c1c; box-shadow: 0 3px 0 #fca5a5; }
+.kp-enter { background: #22c55e; color: white; box-shadow: 0 3px 0 #15803d; }
+.kp-wide { grid-column: span 3; }
+
+body.with-keypad .game-page {
+  min-height: 100svh; box-sizing: border-box;
+  padding-bottom: calc(var(--kp-height) + 12px);
+}
+
+@media (orientation: landscape) {
+  .keypad {
+    left: auto; top: 58px; max-width: none; margin: 0;
+    width: var(--kp-width); box-sizing: border-box;
+    grid-auto-rows: 1fr; align-content: stretch;
+    border-radius: 18px 0 0 0;
+    box-shadow: -4px 0 18px rgba(0,0,0,0.15);
+  }
+  body.with-keypad .game-page { padding-bottom: 0.75rem; padding-right: calc(var(--kp-width) + 0.5rem); }
+}
+
+/* Handy quer: neben dem Block bleibt wenig Hoehe — der Spielinhalt wird als
+   Ganzes kleiner, statt unten abgeschnitten zu werden. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.with-keypad .game-page { padding-top: 62px; justify-content: flex-start; }
+  body.with-keypad .game-page > :not(.game-header) { zoom: 0.68; }
 }

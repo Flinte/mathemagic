@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Star } from 'lucide-react';
 import { GAMES, type Category } from './world/games';
+import { NumInput, type NumInputHandle } from './ui/NumInput';
 import { TOWNS } from './world/towns';
 import { useRoute } from './world/route';
 import { WorldMap } from './world/WorldMap';
@@ -58,7 +59,7 @@ const drawFresh = <T,>(bucket: string, memory: number, roll: () => T, idOf: (t: 
 // `ref` darf je nach Zustand ein anderes Feld sein; deps steuern, wann neu
 // fokussiert wird. focus() auf ein bereits aktives Feld ist folgenlos.
 const useAutoFocus = (
-  ref: { current: HTMLInputElement | null },
+  ref: { current: NumInputHandle | null },
   deps: React.DependencyList,
 ) => useEffect(() => { ref.current?.focus(); }, deps);
 
@@ -261,7 +262,7 @@ const NumberWall = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () 
   // ueber eine feste Ref. Der Fokus wandert nur bei neuer Mauer und nach einem
   // richtigen Stein weiter, sonst wuerde er einem angeklickten Stein
   // hinterherspringen.
-  const brickRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const brickRefs = useRef<Record<number, NumInputHandle | null>>({});
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
   useEffect(() => { if (focusIdx !== null) brickRefs.current[focusIdx]?.focus(); }, [focusIdx, wall]);
 
@@ -320,16 +321,16 @@ const NumberWall = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () 
         <div style={{ marginBottom: '20px', fontWeight: 'bold' }}>Zwei Steine unten ergeben den Stein darüber! 🧱</div>
         <div className="wall-grid">
           <div className="wall-row">
-            <div className="brick">{inputs[0] !== undefined ? <input ref={el => { brickRefs.current[0] = el; }} type="number" value={inputs[0]} onChange={e => check(0, e.target.value)} className="brick-input" /> : wall[0]}</div>
+            <div className="brick">{inputs[0] !== undefined ? <NumInput ref={el => { brickRefs.current[0] = el; }} value={inputs[0]} onChange={v => check(0, v)} className="brick-input" /> : wall[0]}</div>
           </div>
           <div className="wall-row" style={{ position: 'relative' }}>
             <div style={{ position: 'absolute', top: '-15px' }}>➕</div>
-            {[1, 2].map(i => <div key={i} className="brick">{inputs[i] !== undefined ? <input ref={el => { brickRefs.current[i] = el; }} type="number" value={inputs[i]} onChange={e => check(i, e.target.value)} className="brick-input" /> : wall[i]}</div>)}
+            {[1, 2].map(i => <div key={i} className="brick">{inputs[i] !== undefined ? <NumInput ref={el => { brickRefs.current[i] = el; }} value={inputs[i]} onChange={v => check(i, v)} className="brick-input" /> : wall[i]}</div>)}
           </div>
           <div className="wall-row" style={{ position: 'relative' }}>
             <div style={{ position: 'absolute', top: '-15px', left: '25%' }}>➕</div>
             <div style={{ position: 'absolute', top: '-15px', right: '25%' }}>➕</div>
-            {[3, 4, 5].map(i => <div key={i} className="brick">{inputs[i] !== undefined ? <input ref={el => { brickRefs.current[i] = el; }} type="number" value={inputs[i]} onChange={e => check(i, e.target.value)} className="brick-input" /> : wall[i]}</div>)}
+            {[3, 4, 5].map(i => <div key={i} className="brick">{inputs[i] !== undefined ? <NumInput ref={el => { brickRefs.current[i] = el; }} value={inputs[i]} onChange={v => check(i, v)} className="brick-input" /> : wall[i]}</div>)}
           </div>
         </div>
       </div>
@@ -455,7 +456,7 @@ const MultiplicationTafel = ({ grid, onWin, onBack, onMarkCell }: { grid: Record
   const [solved, setSolved] = useState(0);
   const [input, setInput] = useState('');
   const [problem, setProblem] = useState<{ a: number; b: number } | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<NumInputHandle>(null);
   useAutoFocus(inputRef, [problem]);
   const nextProblem = (g: Record<string, boolean>) => { const av: { a: number; b: number }[] = []; for (let a = 1; a <= 10; a++) for (let b = 1; b <= 10; b++) if (!g[`${a}x${b}`]) av.push({ a, b }); return av.length > 0 ? av[Math.floor(Math.random() * av.length)] : null; };
   useEffect(() => setProblem(nextProblem(grid)), []);
@@ -484,7 +485,7 @@ const MultiplicationTafel = ({ grid, onWin, onBack, onMarkCell }: { grid: Record
         <div className="game-container tafel-side">
           <h2>Fülle die Tafel! 🎨</h2>
           <div className="task" style={{ fontSize: '4rem' }}>{problem ? `${problem.a} × ${problem.b} = ?` : 'Fertig! 🎉'}</div>
-          <input ref={inputRef} autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} />
+          <NumInput ref={inputRef} autoFocus className="input-field" value={input} onChange={v => { setInput(v); check(v); }} />
           <StarProgress solved={solved} total={5} />
         </div>
       </div>
@@ -498,7 +499,7 @@ const TauschArena = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: ()
   const [input, setInput] = useState('');
   const [done, setDone] = useState<number[]>([]);
   const [completed, setCompleted] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<NumInputHandle>(null);
   useAutoFocus(inputRef, [family, step]);
   const genFamily = () => {
     // 4 x 7 und 7 x 4 sind dieselbe Aufgaben-Familie — deshalb wird die Sperre
@@ -544,7 +545,7 @@ const TauschArena = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: ()
             </div>
           ))}
         </div>
-        <input ref={inputRef} autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} style={{ marginTop: '1.5rem' }} />
+        <NumInput ref={inputRef} autoFocus className="input-field" value={input} onChange={v => { setInput(v); check(v); }} style={{ marginTop: '1.5rem' }} />
         <StarProgress solved={completed} total={3} />
       </div>
     </div>
@@ -558,7 +559,7 @@ const DivisionGame = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: (
   const [input, setInput] = useState('');
   const [divSolved, setDivSolved] = useState(false);
   const [completed, setCompleted] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<NumInputHandle>(null);
   useAutoFocus(inputRef, [fam, step]);
 
   const gen = () => {
@@ -626,14 +627,13 @@ const DivisionGame = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: (
           )}
         </div>
 
-        <input
+        <NumInput
           ref={inputRef}
           key={step}       /* remount → autoFocus beim Step-Wechsel */
           autoFocus
           className="input-field"
-          type="number"
           value={input}
-          onChange={e => { setInput(e.target.value); check(e.target.value); }}
+          onChange={v => { setInput(v); check(v); }}
         />
 
         <p className="div-hint">
@@ -676,8 +676,8 @@ const ZerlegeDivision = ({ onWin, onBack }: { onWin: (s: string) => void; onBack
   const [wrong, setWrong] = useState([false, false]);
   const [completed, setCompleted] = useState(0);
   const advancing = useRef(false);       // blockt Tippen während der Pause zur nächsten Aufgabe
-  const ref0 = useRef<HTMLInputElement>(null);
-  const ref1 = useRef<HTMLInputElement>(null);
+  const ref0 = useRef<NumInputHandle>(null);
+  const ref1 = useRef<NumInputHandle>(null);
   const refs = [ref0, ref1];
 
   const gen = () => {
@@ -734,13 +734,12 @@ const ZerlegeDivision = ({ onWin, onBack }: { onWin: (s: string) => void; onBack
   const row = (i: number, left: number) => (
     <div className={`zl-row ${done[i] ? 'done' : wrong[i] ? 'wrong' : 'active'}`}>
       <span className="zl-calc">{left} : {d} =</span>
-      <input
+      <NumInput
         ref={refs[i]}
         className="zl-input"
-        type="number"
         value={vals[i]}
         readOnly={done[i]}
-        onChange={e => type(i, e.target.value)}
+        onChange={v => type(i, v)}
       />
       {done[i] && <span className="zl-check">✓</span>}
     </div>
@@ -801,8 +800,8 @@ const RestHaus = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () =>
   const [helped, setHelped] = useState(false);
   const [helpReady, setHelpReady] = useState(false);
   const [revealed, setRevealed] = useState(0); // wie viele Rahmen schon gezeichnet sind
-  const ref0 = useRef<HTMLInputElement>(null);
-  const ref1 = useRef<HTMLInputElement>(null);
+  const ref0 = useRef<NumInputHandle>(null);
+  const ref1 = useRef<NumInputHandle>(null);
   const refs = [ref0, ref1];
 
   const gen = () => {
@@ -880,13 +879,12 @@ const RestHaus = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () =>
   };
 
   const field = (i: number) => (
-    <input
+    <NumInput
       ref={refs[i]}
       className={`rh-input ${done[i] ? 'done' : wrong[i] ? 'wrong' : ''} ${helped ? 'helped' : ''}`}
-      type="number"
       value={helped ? String(answers[i]) : vals[i]}
       readOnly={done[i] || showing}
-      onChange={e => type(i, e.target.value)}
+      onChange={v => type(i, v)}
     />
   );
 
@@ -1000,8 +998,8 @@ const PunktVorStrich = ({ onWin, onBack }: { onWin: (s: string) => void; onBack:
   const [note, setNote] = useState('');
   const [completed, setCompleted] = useState(0);
   const advancing = useRef(false);
-  const ref1 = useRef<HTMLInputElement>(null);
-  const ref2 = useRef<HTMLInputElement>(null);
+  const ref1 = useRef<NumInputHandle>(null);
+  const ref2 = useRef<NumInputHandle>(null);
 
   const gen = () => {
     setTask(drawFresh('punkt-strich', 10, rollPvs, t => t.tokens.join('')));
@@ -1095,9 +1093,9 @@ const PunktVorStrich = ({ onWin, onBack }: { onWin: (s: string) => void; onBack:
           <div className="pvs-rows">
             <div className={`pvs-row ${step > 1 ? 'done' : wrong === 2 ? 'wrong' : 'active'}`}>
               <span className="pvs-calc">{tokens[opIdx - 1]} {tokens[opIdx]} {tokens[opIdx + 1]} =</span>
-              <input ref={ref1} className="pvs-input" type="number"
+              <NumInput ref={ref1} className="pvs-input"
                 value={step > 1 ? String(v) : vals[0]} readOnly={step > 1}
-                onChange={e => type(0, e.target.value)} />
+                onChange={v => type(0, v)} />
               {step > 1 && <span className="pvs-check">✓</span>}
             </div>
 
@@ -1106,8 +1104,8 @@ const PunktVorStrich = ({ onWin, onBack }: { onWin: (s: string) => void; onBack:
                 <span className="pvs-calc">
                   {pointFirst ? <><b>{v}</b> {strichOp} {a} =</> : <>{a} {strichOp} <b>{v}</b> =</>}
                 </span>
-                <input ref={ref2} className="pvs-input" type="number" value={vals[1]}
-                  onChange={e => type(1, e.target.value)} />
+                <NumInput ref={ref2} className="pvs-input" value={vals[1]}
+                  onChange={v => type(1, v)} />
               </div>
             )}
           </div>
@@ -1216,8 +1214,8 @@ const UhrenTurm = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () =
   const [wrong, setWrong] = useState(-1);      // Index des falschen Feldes / der Uhr
   const [solved, setSolved] = useState(0);
   const advancing = useRef(false);
-  const ref0 = useRef<HTMLInputElement>(null);
-  const ref1 = useRef<HTMLInputElement>(null);
+  const ref0 = useRef<NumInputHandle>(null);
+  const ref1 = useRef<NumInputHandle>(null);
   const refs = [ref0, ref1];
 
   // Uhrzeiten lassen sich nicht wie die anderen Haeuser an der Eingabelaenge
@@ -1311,13 +1309,11 @@ const UhrenTurm = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () =
           <>
             <ClockFace h={task.h} m={task.m} size={190} />
             <div className={`uhr-answer ${solvedAll ? 'solved' : ''}`}>
-              <input ref={ref0} className={`uhr-input ${done[0] ? 'done' : wrong === 0 ? 'wrong' : ''}`}
-                type="number" value={vals[0]} readOnly={done[0]}
-                onChange={e => typeRead(0, e.target.value)} />
+              <NumInput ref={ref0} className={`uhr-input ${done[0] ? 'done' : wrong === 0 ? 'wrong' : ''}`} value={vals[0]} readOnly={done[0]}
+                onChange={v => typeRead(0, v)} />
               <span className="uhr-colon">:</span>
-              <input ref={ref1} className={`uhr-input ${done[1] ? 'done' : wrong === 1 ? 'wrong' : ''}`}
-                type="number" value={done[1] ? two(task.m) : vals[1]} readOnly={done[1]}
-                onChange={e => typeRead(1, e.target.value)} />
+              <NumInput ref={ref1} className={`uhr-input ${done[1] ? 'done' : wrong === 1 ? 'wrong' : ''}`} value={done[1] ? two(task.m) : vals[1]} readOnly={done[1]}
+                onChange={v => typeRead(1, v)} />
               <span className="uhr-unit">Uhr</span>
             </div>
             {solvedAll && <div className="uhr-word">{timeWord(task.h, task.m)}</div>}
@@ -1359,9 +1355,8 @@ const UhrenTurm = ({ onWin, onBack }: { onWin: (s: string) => void; onBack: () =
               </div>
             </div>
             <div className={`uhr-answer ${solvedAll ? 'solved' : ''}`}>
-              <input ref={ref0} className={`uhr-input wide ${done[0] ? 'done' : wrong === 0 ? 'wrong' : ''}`}
-                type="number" value={vals[0]} readOnly={done[0]}
-                onChange={e => typeSpan(e.target.value)} />
+              <NumInput ref={ref0} className={`uhr-input wide ${done[0] ? 'done' : wrong === 0 ? 'wrong' : ''}`} value={vals[0]} readOnly={done[0]}
+                onChange={v => typeSpan(v)} />
               <span className="uhr-unit">Minuten</span>
             </div>
           </>
@@ -1384,7 +1379,7 @@ const MathGame = ({ category, performance, onAttempt, onWin, onBack }: { categor
   const [problem, setProblem] = useState(generateProblem(category, performance));
   const [input, setInput] = useState('');
   const [solved, setSolved] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<NumInputHandle>(null);
   useAutoFocus(inputRef, [problem]);
   const total = (category === 'sachaufgaben' || category === 'platzhalter') ? 3 : 5;
   const building = GAMES[category];
@@ -1413,7 +1408,7 @@ const MathGame = ({ category, performance, onAttempt, onWin, onBack }: { categor
               </div>
             : <div className="task">{problem.question}{problem.type !== 'placeholder' && ' = ?'}</div>
         }
-        <input ref={inputRef} autoFocus className="input-field" type="number" value={input} onChange={e => { setInput(e.target.value); check(e.target.value); }} />
+        <NumInput ref={inputRef} autoFocus className="input-field" value={input} onChange={v => { setInput(v); check(v); }} />
       </div>
     </div>
   );
