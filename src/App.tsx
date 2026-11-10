@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Trash2, Star } from 'lucide-react';
+import { ArrowLeft, Star } from 'lucide-react';
+import { GAMES, type Category } from './world/games';
+import { TOWNS } from './world/towns';
+import { useRoute } from './world/route';
+import { WorldMap } from './world/WorldMap';
+import { TownView } from './world/TownView';
+import { SchoolView } from './world/SchoolView';
 
 // --- Zufall ---
 // Alle Generatoren ziehen ueber diese Helfer, damit Verteilung und
@@ -88,37 +94,7 @@ const playSound = (type: 'correct' | 'wrong') => {
   } catch (e) { console.error('Audio error', e); }
 };
 
-// --- Types & Constants ---
-type Category =
-  | 'plus' | 'minus' | 'verdoppeln-halbieren'
-  | 'einmaleins-klein' | 'einmaleins-gross' | 'einmaleins-tafel'
-  | 'division' | 'division-zerlegen' | 'division-rest' | 'tausch-arena' | 'kernaufgaben'
-  | 'sachaufgaben' | 'platzhalter' | 'punkt-vor-strich' | 'uhrzeit'
-  | 'zahlen-fabrik' | 'meister-zelt' | 'differenz-jagd' | 'zahlen-mauer';
-
 const STICKERS = ['⭐', '🌟', '🦄', '🚀', '🎨', '🍕', '🐱', '🐶', '🌈', '🍦', '🍩', '🦁', '🦉', '💎', '🍭', '⚙️', '🏆', '🎈', '🏰'];
-// Der Panda ist das Maskottchen der Klasse 3b und wohnt von Anfang an im Dorf —
-// Schwelle 0. Alle anderen Tiere ziehen nach und nach zu.
-const ANIMAL_TIERS = [
-  { threshold: 0,  emoji: '🐼' },
-  { threshold: 5,  emoji: '🐰' },
-  { threshold: 10, emoji: '🦌' },
-  { threshold: 15, emoji: '🦊' },
-  { threshold: 20, emoji: '🐿️' },
-  { threshold: 25, emoji: '🦔' },
-  { threshold: 30, emoji: '🦄' },
-];
-
-// Fixed spots on the map where each tier animal lives
-const ANIMAL_SPOTS: { threshold: number; emoji: string; left: string; top: string }[] = [
-  { threshold: 0,  emoji: '🐼', left: '30%', top: '71%' },   // im Bambushain
-  { threshold: 5,  emoji: '🐰', left: '17%', top: '90%' },
-  { threshold: 10, emoji: '🦌', left: '5%',  top: '57%' },
-  { threshold: 15, emoji: '🦊', left: '27%', top: '85%' },
-  { threshold: 20, emoji: '🐿️', left: '62%', top: '67%' },
-  { threshold: 25, emoji: '🦔', left: '77%', top: '92%' },
-  { threshold: 30, emoji: '🦄', left: '50%', top: '88%' },
-];
 
 interface PerformanceData { [key: string]: number; }
 
@@ -248,424 +224,10 @@ const generateProblem = (category: Category, _performance: PerformanceData = {})
     p => (Array.isArray(p.question) ? p.question.join('|') : String(p.question)),
   );
 
-// ============================================================
-// MAP COMPONENTS
-// ============================================================
-
-// Bäume: Positionen in Karten-Koordinaten (viewBox 1300×700)
-const TREE_SPOTS: { x: number; y: number; s?: number }[] = [
-  { x: 39, y: 56 }, { x: 91, y: 35, s: 0.72 }, { x: 52, y: 126, s: 0.72 },
-  { x: 143, y: 77 }, { x: 195, y: 49, s: 0.72 }, { x: 104, y: 175 },
-  { x: 1157, y: 42 }, { x: 1222, y: 63, s: 0.72 }, { x: 1183, y: 126, s: 0.72 },
-  { x: 1261, y: 98 }, { x: 1118, y: 91, s: 0.72 },
-  { x: 325, y: 42, s: 0.72 }, { x: 377, y: 63 }, { x: 351, y: 98, s: 0.72 },
-  { x: 819, y: 476 }, { x: 858, y: 448, s: 0.72 },
-  { x: 650, y: 546, s: 0.72 }, { x: 728, y: 518 },
-  { x: 416, y: 602, s: 0.72 }, { x: 468, y: 630, s: 0.72 },
-  { x: 26, y: 350, s: 0.72 }, { x: 1274, y: 336, s: 0.72 },
-];
-
-// Grasbüschel an den Wegrändern — brechen die Silhouette auf, damit der Weg
-// nicht wie aufgeklebt wirkt. Das ist der eigentliche Trick.
-const PATH_TUFTS: [number, number][] = [
-  [60, 393], [150, 384], [250, 382], [360, 435], [470, 443], [560, 397],
-  [640, 441], [740, 388], [830, 431], [930, 383], [1030, 430], [1120, 385],
-  [1210, 427], [1270, 378], [78, 470], [146, 502], [96, 538], [166, 568],
-  [458, 360], [500, 300], [452, 240], [600, 158], [700, 192], [750, 152],
-  [952, 300], [1010, 380], [958, 460], [300, 450], [280, 520], [310, 570],
-];
-
-// Erdflecken im Weginneren. Bewusst ungleichmäßig gestreut und unterschiedlich
-// gedreht: jede durchgehende Längsstruktur liest sich sofort wieder als Straße.
-const PATH_SPECKS: [number, number, number, number, number, string][] = [
-  [40, 428, 7, 4, -12, '#cfb185'], [88, 410, 5, 3, 8, '#f3e7c6'], [130, 421, 9, 4, -6, '#c7a878'],
-  [176, 402, 4, 2.5, 14, '#bda06f'], [220, 412, 7, 3.5, -9, '#f3e7c6'], [268, 398, 5, 3, 6, '#cfb185'],
-  [312, 418, 8, 4, -14, '#c7a878'], [356, 400, 4, 2.5, 10, '#bda06f'], [400, 424, 6, 3, -5, '#f3e7c6'],
-  [446, 406, 7, 3.5, 12, '#cfb185'], [490, 428, 5, 3, -8, '#f3e7c6'], [534, 410, 9, 4, 4, '#c7a878'],
-  [578, 430, 4, 2.5, -11, '#bda06f'], [622, 408, 6, 3.5, 9, '#f3e7c6'], [666, 426, 8, 4, -6, '#cfb185'],
-  [710, 404, 5, 3, 13, '#f3e7c6'], [754, 422, 7, 3.5, -9, '#c7a878'], [798, 400, 4, 2.5, 5, '#bda06f'],
-  [842, 416, 9, 4, -13, '#cfb185'], [886, 396, 6, 3, 8, '#f3e7c6'], [930, 418, 5, 3, -7, '#c7a878'],
-  [974, 398, 7, 3.5, 11, '#f3e7c6'], [1018, 420, 4, 2.5, -5, '#bda06f'], [1062, 400, 8, 4, 9, '#cfb185'],
-  [1106, 418, 6, 3, -12, '#f3e7c6'], [1150, 396, 5, 3, 6, '#c7a878'], [1194, 414, 7, 3.5, -8, '#f3e7c6'],
-  [1238, 394, 4, 2.5, 12, '#bda06f'], [1278, 408, 6, 3, -6, '#cfb185'],
-  [104, 442, 5, 3, -10, '#cfb185'], [116, 476, 4, 2.5, 8, '#f3e7c6'], [126, 512, 6, 3, -6, '#c7a878'],
-  [134, 548, 4, 2.5, 12, '#bda06f'], [142, 582, 5, 3, -9, '#f3e7c6'],
-  [478, 386, 5, 3, 7, '#cfb185'], [474, 330, 4, 2.5, -11, '#f3e7c6'], [472, 268, 6, 3, 6, '#c7a878'],
-  [476, 214, 4, 2.5, -8, '#bda06f'],
-  [590, 184, 5, 3, 9, '#f3e7c6'], [660, 174, 4, 2.5, -7, '#cfb185'], [736, 174, 5, 3, 11, '#c7a878'],
-  [826, 178, 4, 2.5, -6, '#f3e7c6'], [922, 202, 5, 3, 8, '#bda06f'],
-  [976, 300, 5, 3, -9, '#cfb185'], [988, 366, 4, 2.5, 7, '#f3e7c6'], [990, 434, 5, 3, -12, '#c7a878'],
-  [312, 452, 4, 2.5, -8, '#f3e7c6'], [302, 516, 5, 3, 10, '#cfb185'], [294, 578, 4, 2.5, -6, '#c7a878'],
-];
-
-const MAIN_ROAD = 'M 0 422 C 88 412, 208 404, 318 408 S 516 422, 676 416 S 896 406, 1072 410 S 1222 404, 1300 400';
-const PATH_PLAZA = 'M 96 416 C 110 474, 124 538, 146 604';
-const PATH_SCHOOL = 'M 482 414 C 478 340, 470 264, 476 184';
-const PATH_EAST = 'M 542 192 C 624 180, 712 170, 778 176';
-const PATH_ADVENTURE = 'M 778 176 C 858 172, 928 196, 966 254';
-const PATH_RIGHT = 'M 966 254 C 984 344, 992 420, 982 466';
-const PATH_SOUTH = 'M 318 408 C 310 480, 298 548, 292 618';
-
-// Alle Wege in einem Durchgang: erst die weiche Erdaura, dann die Wegfläche,
-// dann die unscharfe Aufhellung. Kein Mittelstreifen, keine Zebrastreifen.
-const PATHS: { d: string; w: number }[] = [
-  { d: MAIN_ROAD, w: 42 }, { d: PATH_PLAZA, w: 28 }, { d: PATH_SCHOOL, w: 30 },
-  { d: PATH_EAST, w: 26 }, { d: PATH_ADVENTURE, w: 24 }, { d: PATH_RIGHT, w: 24 },
-  { d: PATH_SOUTH, w: 18 },
-];
-
-// Bambushain — das Zuhause des Pandas. Halme werden leicht unterschiedlich
-// hoch und geneigt gezeichnet; ein Hain aus identischen Halmen liest sich sofort
-// als Zaun statt als Pflanze.
-// Zwei Gruppen mit einer Luecke in der Mitte — dort steht der Panda, sonst
-// verschwindet er hinter den Halmen.
-const BAMBOO_SPOTS: { x: number; y: number; h: number; lean: number }[] = [
-  { x: 352, y: 524, h: 62, lean: -5 }, { x: 366, y: 530, h: 82, lean: 2 },
-  { x: 379, y: 522, h: 54, lean: 4 },
-  { x: 424, y: 528, h: 76, lean: -3 }, { x: 437, y: 521, h: 58, lean: 4 },
-  { x: 449, y: 530, h: 88, lean: -2 },
-];
-
-const MapBamboo = ({ x, y, h, lean }: { x: number; y: number; h: number; lean: number }) => (
-  <g transform={`translate(${x},${y}) rotate(${lean})`}>
-    <ellipse cx="0" cy="2" rx="11" ry="4" fill="#4a7f38" opacity="0.3" filter="url(#fSoft)" />
-    <rect x="-3" y={-h} width="6" height={h} rx="3" fill="#7cb342" />
-    {/* Knoten: die Segmentierung ist das, was einen Halm als Bambus lesbar macht */}
-    {Array.from({ length: Math.floor(h / 18) }, (_, i) => (
-      <rect key={i} x="-4" y={-h + 14 + i * 18} width="8" height="2.5" rx="1.2" fill="#558b2f" />
-    ))}
-    <path d={`M 2 ${-h + 8} q 16 -8 24 2 q -16 4 -24 -2 Z`} fill="#8bc34a" />
-    <path d={`M -2 ${-h + 26} q -18 -7 -26 3 q 17 4 26 -3 Z`} fill="#689f38" />
-    <path d={`M 2 ${-h + 44} q 15 -6 22 3 q -15 3 -22 -3 Z`} fill="#8bc34a" opacity="0.9" />
-  </g>
-);
-
-const MapTree = ({ x, y, s = 1 }: { x: number; y: number; s?: number }) => (
-  <g transform={`translate(${x},${y}) scale(${s})`}>
-    <ellipse cx="6" cy="24" rx="26" ry="8" fill="#4a7f38" opacity="0.35" filter="url(#fSoft)" />
-    <path d="M -4 24 L -4 4 q 4 -6 8 0 L 4 24 Z" fill="#8d5f3c" />
-    <circle cx="-9" cy="-2" r="17" fill="#3f8b45" />
-    <circle cx="10" cy="2" r="15" fill="#4f9c4c" />
-    <circle cx="0" cy="-14" r="16" fill="#61b357" />
-    <circle cx="-5" cy="-19" r="8" fill="#7fca6d" opacity="0.85" />
-  </g>
-);
-
-const MapTerrain = () => (
-  <svg className="map-terrain" viewBox="0 0 1300 700" preserveAspectRatio="xMidYMid slice">
-    <defs>
-      <linearGradient id="gGrass" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#a8d873" />
-        <stop offset="100%" stopColor="#7fbc55" />
-      </linearGradient>
-      <linearGradient id="gLake" x1="0.2" y1="0" x2="0.8" y2="1">
-        <stop offset="0%" stopColor="#9adcf2" />
-        <stop offset="100%" stopColor="#63b6dd" />
-      </linearGradient>
-      <filter id="fSoft" x="-40%" y="-40%" width="180%" height="180%">
-        <feGaussianBlur stdDeviation="6" />
-      </filter>
-      <filter id="fHaze" x="-30%" y="-30%" width="160%" height="160%">
-        <feGaussianBlur stdDeviation="18" />
-      </filter>
-      <filter id="fEdge" x="-20%" y="-30%" width="140%" height="160%">
-        <feGaussianBlur stdDeviation="3.5" />
-      </filter>
-    </defs>
-
-    {/* Wiese: warme Grundfläche mit weichen Sonnenflecken */}
-    <rect width="1300" height="700" fill="url(#gGrass)" />
-    <ellipse cx="330" cy="250" rx="300" ry="190" fill="#c6e58c" opacity="0.42" filter="url(#fHaze)" />
-    <ellipse cx="980" cy="470" rx="330" ry="210" fill="#c0e488" opacity="0.3" filter="url(#fHaze)" />
-    <ellipse cx="640" cy="640" rx="360" ry="140" fill="#6faa4b" opacity="0.28" filter="url(#fHaze)" />
-
-    {/* ── Wald oben links ── */}
-    <ellipse cx="86"  cy="150" rx="96" ry="80" fill="#3f8b45" />
-    <ellipse cx="150" cy="106" rx="72" ry="60" fill="#54a552" />
-    <ellipse cx="42"  cy="196" rx="58" ry="50" fill="#478f47" />
-    <ellipse cx="196" cy="156" rx="50" ry="44" fill="#63b45c" />
-    <ellipse cx="132" cy="88"  rx="40" ry="30" fill="#7cc76c" opacity="0.75" />
-
-    {/* ── Wald oben rechts ── */}
-    <ellipse cx="1246" cy="128" rx="86" ry="72" fill="#3f8b45" />
-    <ellipse cx="1188" cy="160" rx="60" ry="52" fill="#54a552" />
-    <ellipse cx="1276" cy="200" rx="50" ry="44" fill="#478f47" />
-    <ellipse cx="1240" cy="104" rx="40" ry="28" fill="#7cc76c" opacity="0.7" />
-
-    {/* ── Wäldchen in der Mitte ── */}
-    <ellipse cx="648" cy="498" rx="52" ry="44" fill="#4a9c4e" opacity="0.6" />
-    <ellipse cx="686" cy="472" rx="38" ry="34" fill="#5cb058" opacity="0.6" />
-
-    {/* ── See unten rechts ── */}
-    <ellipse cx="960" cy="598" rx="228" ry="128" fill="#4f9dc4" opacity="0.45" filter="url(#fSoft)" />
-    <ellipse cx="960" cy="598" rx="216" ry="118" fill="url(#gLake)" />
-    <ellipse cx="960" cy="598" rx="216" ry="118" fill="none" stroke="#e8f6fb" strokeWidth="4" opacity="0.55" />
-    <ellipse cx="912" cy="578" rx="58" ry="7" fill="white" opacity="0.5" transform="rotate(-9 912 578)" />
-    <ellipse cx="1016" cy="610" rx="40" ry="5" fill="white" opacity="0.45" transform="rotate(6 1016 610)" />
-    <ellipse cx="946" cy="630" rx="28" ry="4" fill="white" opacity="0.4" />
-    <g stroke="#4f8f3f" strokeWidth="4" strokeLinecap="round" fill="none">
-      <path d="M 758 560 q -6 -26 2 -40 M 768 564 q 2 -30 12 -42 M 778 562 q 8 -24 20 -34" />
-      <path d="M 1170 580 q 6 -26 -2 -40 M 1160 584 q -2 -30 -12 -42" />
-    </g>
-
-    {/* ── Dorfplatz ── */}
-    <ellipse cx="155" cy="614" rx="134" ry="90" fill="#e3caa0" />
-    <ellipse cx="155" cy="614" rx="134" ry="90" fill="none" stroke="#c7a778" strokeWidth="4" />
-    <g fill="#d3b489" opacity="0.85">
-      <ellipse cx="96"  cy="590" rx="15" ry="8" /><ellipse cx="140" cy="580" rx="13" ry="7" />
-      <ellipse cx="188" cy="592" rx="16" ry="8" /><ellipse cx="234" cy="608" rx="13" ry="7" />
-      <ellipse cx="112" cy="634" rx="16" ry="8" /><ellipse cx="166" cy="646" rx="14" ry="7" />
-      <ellipse cx="220" cy="638" rx="12" ry="6" /><ellipse cx="66"  cy="618" rx="13" ry="7" />
-    </g>
-
-    {/* ── Schulhof ── */}
-    <rect x="298" y="72" width="392" height="322" rx="24" fill="#b6dfa8" opacity="0.35" filter="url(#fSoft)" />
-
-    {/* ================================================================
-        WEGE — getretener Pfad, keine Straße: weiche Erdaura statt harter
-        Kante, Kreuzungen als kleine Lichtung, im Inneren nur gestreute
-        Erdflecken. Jede durchgehende Längslinie sähe wieder nach Fahrbahn aus.
-        ================================================================ */}
-
-    {/* Kreuzungslichtungen, damit die Wege ineinander laufen statt sich zu schneiden */}
-    <g fill="#cfae7e" opacity="0.9" filter="url(#fEdge)">
-      <ellipse cx="482" cy="414" rx="46" ry="30" />
-      <ellipse cx="318" cy="408" rx="38" ry="26" />
-      <ellipse cx="96"  cy="418" rx="38" ry="26" />
-      <ellipse cx="778" cy="176" rx="32" ry="22" />
-      <ellipse cx="966" cy="254" rx="30" ry="22" />
-      <ellipse cx="542" cy="192" rx="30" ry="22" />
-    </g>
-
-    {PATHS.map(p => (
-      <path key={`aura-${p.d}`} d={p.d} stroke="#cfae7e" strokeWidth={p.w + 16}
-            fill="none" strokeLinecap="round" filter="url(#fEdge)" opacity="0.9" />
-    ))}
-    {PATHS.map(p => (
-      <path key={`fill-${p.d}`} d={p.d} stroke="#e6d3a8" strokeWidth={p.w}
-            fill="none" strokeLinecap="round" />
-    ))}
-    {PATHS.map(p => (
-      <path key={`core-${p.d}`} d={p.d} stroke="#f2e4c2" strokeWidth={p.w * 0.5}
-            fill="none" strokeLinecap="round" opacity="0.45" filter="url(#fEdge)" />
-    ))}
-
-    {/* Großflächige, unscharfe Tonwertwechsel — heller und dunkler, ohne Kante */}
-    <g opacity="0.28" filter="url(#fEdge)">
-      <ellipse cx="180" cy="408" rx="30" ry="11" fill="#c7a878" />
-      <ellipse cx="520" cy="420" rx="34" ry="12" fill="#f4e8c8" />
-      <ellipse cx="880" cy="408" rx="32" ry="11" fill="#c7a878" />
-      <ellipse cx="1150" cy="406" rx="28" ry="10" fill="#f4e8c8" />
-      <ellipse cx="122" cy="500" rx="11" ry="24" fill="#c7a878" />
-      <ellipse cx="476" cy="300" rx="12" ry="26" fill="#f4e8c8" />
-      <ellipse cx="986" cy="390" rx="10" ry="22" fill="#c7a878" />
-    </g>
-
-    {/* Erdflecken */}
-    {PATH_SPECKS.map(([x, y, rx, ry, rot, fill], i) => (
-      <ellipse key={`sp${i}`} cx={x} cy={y} rx={rx} ry={ry} fill={fill}
-               transform={`rotate(${rot} ${x} ${y})`} />
-    ))}
-
-    {/* Grasbüschel über den Wegrändern */}
-    <g stroke="#6ba646" strokeWidth="3.5" strokeLinecap="round" fill="none">
-      {PATH_TUFTS.map(([x, y], i) => (
-        <path key={`tu${i}`} d={`M ${x} ${y} q 4 -12 8 -2 M ${x + 12} ${y + 2} q 5 -14 9 -3`} />
-      ))}
-    </g>
-
-    {/* Bäume */}
-    {TREE_SPOTS.map((t, i) => <MapTree key={`tr${i}`} x={t.x} y={t.y} s={t.s} />)}
-
-    {/* Bambushain des Pandas */}
-    {BAMBOO_SPOTS.map((b, i) => <MapBamboo key={`bb${i}`} x={b.x} y={b.y} h={b.h} lean={b.lean} />)}
-  </svg>
-);
-
-// Building data
-const BUILDINGS: {
-  category: Category;
-  label: string;
-  icon: string;
-  color: string;
-  roofColor: string;
-  shape: HouseShape;
-  left: string;
-  top: string;
-}[] = [
-  // Zone 1 – Rechendorf
-  { category: 'plus',                 label: 'Plus-Haus',      icon: '➕', color: '#ef5350', roofColor: '#b71c1c', shape: 'cottage',  left: '9%',  top: '60%' },
-  { category: 'minus',                label: 'Minus-Turm',     icon: '➖', color: '#42a5f5', roofColor: '#1565c0', shape: 'tower',    left: '19%', top: '55%' },
-  { category: 'verdoppeln-halbieren', label: 'Spiegel-Haus',   icon: '🔄', color: '#66bb6a', roofColor: '#2e7d32', shape: 'barrel',   left: '13%', top: '79%' },
-  // Zone 2 – Malviertel
-  { category: 'einmaleins-klein',     label: '1×1 (bis 5)',    icon: '✖️', color: '#ab47bc', roofColor: '#6a1b9a', shape: 'cottage',  left: '37%', top: '25%' },
-  { category: 'einmaleins-gross',     label: '1×1 (bis 10)',   icon: '✖️', color: '#7b1fa2', roofColor: '#4a148c', shape: 'twostory', left: '48%', top: '21%' },
-  { category: 'einmaleins-tafel',     label: '1×1 Tafel',      icon: '📋', color: '#e91e63', roofColor: '#880e4f', shape: 'workshop', left: '43%', top: '41%' },
-  { category: 'division',             label: 'Divisions-Haus', icon: '➗', color: '#1e88e5', roofColor: '#0d47a1', shape: 'twostory', left: '58%', top: '22%' },
-  { category: 'division-zerlegen',    label: 'Zerlege-Werkstatt', icon: '🧩', color: '#00897b', roofColor: '#004d40', shape: 'workshop', left: '64%', top: '38%' },
-  { category: 'division-rest',       label: 'Rest-Haus',      icon: '🍪', color: '#0097a7', roofColor: '#006064', shape: 'cottage',  left: '33%', top: '48%' },
-  { category: 'kernaufgaben',         label: 'Kern-Trainer',   icon: '🔑', color: '#fb8c00', roofColor: '#e65100', shape: 'cottage',  left: '55%', top: '51%' },
-  { category: 'tausch-arena',         label: 'Tausch-Arena',   icon: '🏡', color: '#43a047', roofColor: '#1b5e20', shape: 'barrel',   left: '45%', top: '62%' },
-  // Zone 3 – Abenteuerviertel
-  { category: 'sachaufgaben',         label: 'Rechen-Post',    icon: '✉️', color: '#f4511e', roofColor: '#bf360c', shape: 'cottage',  left: '70%', top: '21%' },
-  { category: 'platzhalter',          label: 'Rätsel-Höhle',   icon: '🔍', color: '#8d6e63', roofColor: '#4e342e', shape: 'tower',    left: '80%', top: '37%' },
-  { category: 'punkt-vor-strich',    label: 'Vorfahrt-Haus',  icon: '🚦', color: '#3949ab', roofColor: '#1a237e', shape: 'twostory', left: '88%', top: '48%' },
-  { category: 'zahlen-fabrik',        label: 'Zahlen-Fabrik',  icon: '⚙️', color: '#546e7a', roofColor: '#263238', shape: 'workshop', left: '74%', top: '57%' },
-  { category: 'uhrzeit',             label: 'Uhren-Turm',     icon: '⏰', color: '#6d4c41', roofColor: '#3e2723', shape: 'tower',    left: '27%', top: '38%' },
-  { category: 'meister-zelt',         label: 'Meister-Zelt',   icon: '🏆', color: '#ffca28', roofColor: '#f57f17', shape: 'tent',     left: '84%', top: '67%' },
-  { category: 'differenz-jagd',       label: 'Differenz-See',  icon: '🌊', color: '#29b6f6', roofColor: '#01579b', shape: 'barrel',   left: '69%', top: '80%' },
-  { category: 'zahlen-mauer',         label: 'Zahlen-Mauer',   icon: '🧱', color: '#a1887f', roofColor: '#4e342e', shape: 'twostory', left: '83%', top: '81%' },
-];
-
-// ── Gezeichnete Häuser ──
-// Alle Bauformen teilen sich das Innere (Schild mit Zeichen, Tür, Fenster);
-// unterschieden werden sie über die Silhouette — das ist es, was auf
-// Kartengröße überhaupt erkennbar bleibt.
-
-const WOOD = '#8d5a3b';
-const WOOD_FACE = '#c99a63';
-const GLASS = '#ffe9a8';
-
-// Schild mit dem Zeichen der Aufgabenart — ersetzt das direkt auf die Wand
-// geklebte Emoji, bleibt aber als Erkennungsmerkmal für Leseanfänger erhalten.
-const HouseSign = ({ icon, y = 72, w = 32, h = 24 }: { icon: string; y?: number; w?: number; h?: number }) => (
-  <g>
-    <rect x={60 - w / 2} y={y} width={w} height={h} rx="3" fill={WOOD} />
-    <rect x={60 - w / 2 + 2.5} y={y + 2.5} width={w - 5} height={h - 5} rx="2" fill={WOOD_FACE} />
-    <text x="60" y={y + h / 2 + h * 0.3} textAnchor="middle" fontSize={h * 0.8}>{icon}</text>
-  </g>
-);
-
-const HouseDoor = ({ x = 52, y = 102, w = 16, h = 24 }: { x?: number; y?: number; w?: number; h?: number }) => (
-  <g>
-    <path d={`M ${x} ${y + h} L ${x} ${y + 7} q 0 -7 ${w / 2} -7 q ${w / 2} 0 ${w / 2} 7 L ${x + w} ${y + h} Z`} fill={WOOD} />
-    <circle cx={x + w - 4} cy={y + h * 0.55} r="1.8" fill="#ffd77a" />
-  </g>
-);
-
-const HouseWindow = ({ x, y, w = 14, h = 14 }: { x: number; y: number; w?: number; h?: number }) => (
-  <g>
-    <rect x={x} y={y} width={w} height={h} rx="2.5" fill={GLASS} stroke={WOOD} strokeWidth="2.5" />
-    <path d={`M ${x + w / 2} ${y} L ${x + w / 2} ${y + h} M ${x} ${y + h / 2} L ${x + w} ${y + h / 2}`} stroke={WOOD} strokeWidth="1.8" />
-  </g>
-);
-
-type HouseShape = 'cottage' | 'tower' | 'twostory' | 'workshop' | 'barrel' | 'tent';
-
-const HouseArt = ({ shape, color, roofColor, icon }: { shape: HouseShape; color: string; roofColor: string; icon: string }) => (
-  <svg className="mb-svg" viewBox="0 0 120 140" preserveAspectRatio="xMidYMax meet">
-    <ellipse cx="63" cy="126" rx="44" ry="8" fill="#4a7f38" opacity="0.3" />
-
-    {shape === 'tent' ? (
-      <>
-        <path d="M 60 18 L 112 126 L 8 126 Z" fill={color} />
-        <path d="M 60 18 L 60 126 L 8 126 Z" fill="#fff" opacity="0.13" />
-        <path d="M 60 18 L 78 126 L 62 126 Z" fill={roofColor} opacity="0.55" />
-        <path d="M 60 18 L 42 126 L 58 126 Z" fill={roofColor} opacity="0.35" />
-        <path d="M 60 12 L 60 22" stroke={WOOD} strokeWidth="3.5" strokeLinecap="round" />
-        <path d="M 62 12 L 84 18 L 62 24 Z" fill="#ffca28" />
-        <path d="M 48 126 L 54 96 q 6 -8 12 0 L 72 126 Z" fill="#4a2f1e" />
-        <HouseSign icon={icon} y={60} w={30} h={24} />
-      </>
-    ) : shape === 'tower' ? (
-      <>
-        <path d="M 36 126 L 36 52 q 0 -5 5 -5 L 79 47 q 5 0 5 5 L 84 126 Z" fill={color} />
-        <path d="M 68 48 L 84 52 L 84 126 L 68 126 Z" fill="#000" opacity="0.13" />
-        <rect x="33" y="40" width="54" height="10" rx="4" fill={roofColor} opacity="0.75" />
-        <path d="M 28 42 L 60 16 L 92 42 Z" fill={roofColor} />
-        <path d="M 28 42 L 60 16 L 60 42 Z" fill="#fff" opacity="0.13" />
-        <path d="M 60 16 L 60 4" stroke={WOOD} strokeWidth="3" strokeLinecap="round" />
-        <path d="M 62 5 L 84 10 L 62 15 Z" fill="#ffca28" />
-        <HouseSign icon={icon} y={60} w={28} h={22} />
-        <circle cx="60" cy="94" r="6.5" fill={GLASS} stroke={WOOD} strokeWidth="2.5" />
-        <HouseDoor x={53} y={104} w={14} h={22} />
-      </>
-    ) : shape === 'twostory' ? (
-      <>
-        <path d="M 22 126 L 22 62 q 0 -6 6 -6 L 92 56 q 6 0 6 6 L 98 126 Z" fill={color} />
-        <path d="M 80 58 L 98 62 L 98 126 L 80 126 Z" fill="#000" opacity="0.12" />
-        <path d="M 10 64 L 60 18 L 110 64 q 3 4 -3 4 L 13 68 q -6 0 -3 -4 Z" fill={roofColor} />
-        <path d="M 10 64 L 60 18 L 60 68 L 13 68 q -6 0 -3 -4 Z" fill="#fff" opacity="0.12" />
-        <g stroke="#000" strokeWidth="2" opacity="0.16" strokeLinecap="round">
-          <path d="M 20 60 L 100 60" /><path d="M 32 48 L 88 48" />
-        </g>
-        <rect x="22" y="94" width="76" height="3" fill="#000" opacity="0.12" />
-        <HouseWindow x={30} y={72} w={13} h={13} />
-        <HouseWindow x={77} y={72} w={13} h={13} />
-        <HouseSign icon={icon} y={99} w={30} h={22} />
-        <HouseDoor x={26} y={104} w={14} h={22} />
-      </>
-    ) : shape === 'workshop' ? (
-      <>
-        <rect x="24" y="26" width="13" height="28" rx="3" fill={roofColor} />
-        <rect x="21" y="22" width="19" height="9" rx="4" fill={roofColor} opacity="0.8" />
-        <path d="M 24 126 L 24 78 L 96 66 L 96 126 Z" fill={color} />
-        <path d="M 80 68 L 96 66 L 96 126 L 80 126 Z" fill="#000" opacity="0.12" />
-        <path d="M 12 78 L 108 62 L 108 74 L 12 90 Z" fill={roofColor} />
-        <path d="M 12 78 L 108 62 L 108 67 L 12 83 Z" fill="#fff" opacity="0.12" />
-        <HouseSign icon={icon} y={92} w={30} h={22} />
-        <HouseWindow x={28} y={94} w={13} h={13} />
-        <HouseWindow x={80} y={90} w={13} h={13} />
-        <HouseDoor x={52} y={116} w={16} h={10} />
-      </>
-    ) : shape === 'barrel' ? (
-      <>
-        <path d="M 26 126 L 26 74 q 0 -6 6 -6 L 88 68 q 6 0 6 6 L 94 126 Z" fill={color} />
-        <path d="M 76 70 L 94 74 L 94 126 L 76 126 Z" fill="#000" opacity="0.12" />
-        <path d="M 14 72 q 46 -50 92 0 q 2 4 -4 4 L 18 76 q -6 0 -4 -4 Z" fill={roofColor} />
-        <path d="M 14 72 q 23 -25 46 -30 L 60 76 L 18 76 q -6 0 -4 -4 Z" fill="#fff" opacity="0.13" />
-        <HouseWindow x={30} y={82} w={13} h={13} />
-        <HouseWindow x={77} y={82} w={13} h={13} />
-        <HouseSign icon={icon} y={78} w={28} h={22} />
-        <HouseDoor x={52} y={104} w={16} h={22} />
-      </>
-    ) : (
-      <>
-        <rect x="74" y="24" width="13" height="28" rx="3" fill={roofColor} />
-        <rect x="71" y="20" width="19" height="9" rx="4" fill={roofColor} opacity="0.8" />
-        <g fill="#fff" opacity="0.55">
-          <circle cx="90" cy="14" r="5" /><circle cx="99" cy="6" r="5" />
-        </g>
-        <path d="M 24 126 L 24 74 q 0 -6 6 -6 L 90 68 q 6 0 6 6 L 96 126 Z" fill={color} />
-        <path d="M 78 70 L 96 74 L 96 126 L 78 126 Z" fill="#000" opacity="0.12" />
-        <path d="M 12 70 L 60 30 L 108 70 q 3 4 -3 4 L 15 74 q -6 0 -3 -4 Z" fill={roofColor} />
-        <path d="M 12 70 L 60 30 L 60 74 L 15 74 q -6 0 -3 -4 Z" fill="#fff" opacity="0.12" />
-        <g stroke="#000" strokeWidth="2" opacity="0.18" strokeLinecap="round">
-          <path d="M 22 66 L 98 66" /><path d="M 34 54 L 86 54" /><path d="M 46 42 L 74 42" />
-        </g>
-        <HouseWindow x={29} y={80} w={13} h={13} />
-        <HouseWindow x={78} y={80} w={13} h={13} />
-        <HouseSign icon={icon} y={76} w={28} h={22} />
-        <HouseDoor x={52} y={102} w={16} h={24} />
-      </>
-    )}
-  </svg>
-);
-
-interface MapBuildingProps {
-  label: string; icon: string; color: string; roofColor: string; shape: HouseShape;
-  stickers: string[]; left: string; top: string; onClick: () => void;
-}
-
-const MapBuilding = ({ label, icon, color, roofColor, shape, stickers, left, top, onClick }: MapBuildingProps) => (
-  <div className="map-building" style={{ left, top }} onClick={onClick}>
-    <div className="mb-art">
-      {stickers.length > 0 && (
-        <div className="mb-badge">
-          <Star size={9} fill="#f59e0b" stroke="none" />
-          {stickers.length}
-        </div>
-      )}
-      <HouseArt shape={shape} color={color} roofColor={roofColor} icon={icon} />
-    </div>
-    <div className="mb-label">{label}</div>
-  </div>
-);
-
 // ── Shared game UI ──
 
 const GameHeader = ({ category, onBack }: { category: Category; onBack: () => void }) => {
-  const b = BUILDINGS.find(b => b.category === category)!;
+  const b = GAMES[category];
   return (
     <div className="game-header" style={{ background: b.color }}>
       <button className="back-button-small" onClick={onBack}><ArrowLeft size={20} /></button>
@@ -1825,7 +1387,7 @@ const MathGame = ({ category, performance, onAttempt, onWin, onBack }: { categor
   const inputRef = useRef<HTMLInputElement>(null);
   useAutoFocus(inputRef, [problem]);
   const total = (category === 'sachaufgaben' || category === 'platzhalter') ? 3 : 5;
-  const building = BUILDINGS.find(b => b.category === category)!;
+  const building = GAMES[category];
   const check = (val: string) => {
     const n = parseInt(val); if (isNaN(n)) return;
     if (n === problem.answer) {
@@ -1862,150 +1424,88 @@ const MathGame = ({ category, performance, onAttempt, onWin, onBack }: { categor
 // ============================================================
 export default function App() {
   const [state, setState] = useState<{
-    category: Category | null;
     stickers: Record<Category, string[]>;
     performance: PerformanceData;
     multiplicationGrid: Record<string, boolean>;
   }>(() => {
     const saved = localStorage.getItem('mathemagic-save');
-    const defaults = { category: null, stickers: DEFAULT_STICKERS, performance: {}, multiplicationGrid: {} };
+    const defaults = { stickers: DEFAULT_STICKERS, performance: {}, multiplicationGrid: {} };
     if (!saved) return defaults;
-    try { const p = JSON.parse(saved); return { ...defaults, ...p, stickers: { ...DEFAULT_STICKERS, ...(p.stickers || {}) } }; }
+    // Aeltere Spielstaende enthalten noch `category` — das steht heute in der Adresse.
+    try { const p = JSON.parse(saved); delete p.category; return { ...defaults, ...p, stickers: { ...DEFAULT_STICKERS, ...(p.stickers || {}) } }; }
     catch { return defaults; }
   });
-
+  const { route, go, back } = useRoute();
   const [pendingWin, setPendingWin] = useState<{ sticker: string; category: Category } | null>(null);
-  const panRef = useRef<HTMLDivElement>(null);
 
-  // Auf schmalen Geräten ist die Karte breiter als der Bildschirm — dann in der
-  // Mitte starten statt am linken Rand, sonst sieht man nur Wald.
-  useEffect(() => {
-    const el = panRef.current;
-    if (el) el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
-  }, [state.category]);
-
+  const category = route.screen === 'game' ? route.game : null;
   const totalStickers = Object.values(state.stickers).flat().length;
-  const currentTier = [...ANIMAL_TIERS].reverse().find(t => totalStickers >= t.threshold);
 
-  useEffect(() => {
-    const { category, ...toSave } = state;
-    localStorage.setItem('mathemagic-save', JSON.stringify(toSave));
-  }, [state]);
+  useEffect(() => { localStorage.setItem('mathemagic-save', JSON.stringify(state)); }, [state]);
 
-  const setCategory = (cat: Category | null) => setState(p => ({ ...p, category: cat }));
-  const onBack = () => setCategory(null);
+  // Jeder Bildschirmwechsel beginnt oben — sonst landet man nach einer langen
+  // Karte mitten im naechsten Bild.
+  useEffect(() => { window.scrollTo(0, 0); }, [route, pendingWin]);
+
+  const play = (game: Category) => go({ screen: 'game', game });
+  const onBack = back;
   const onAttempt = (key: string, correct: boolean) => setState(p => ({ ...p, performance: { ...p.performance, [key]: Math.max(1, (p.performance[key] || 10) + (correct ? -2 : 10)) } }));
   const onWin = (sticker: string) => {
-    if (!state.category) return;
-    setPendingWin({ sticker, category: state.category });
+    if (!category) return;
+    setPendingWin({ sticker, category });
   };
   const saveWin = () => {
     if (!pendingWin) return;
-    setState(p => ({ ...p, category: null, stickers: { ...p.stickers, [pendingWin.category]: [...(p.stickers[pendingWin.category] || []), pendingWin.sticker] } }));
+    setState(p => ({ ...p, stickers: { ...p.stickers, [pendingWin.category]: [...(p.stickers[pendingWin.category] || []), pendingWin.sticker] } }));
     setPendingWin(null);
+    back();
   };
   const onMarkCell = (key: string) => setState(p => ({ ...p, multiplicationGrid: { ...p.multiplicationGrid, [key]: true } }));
-  const reset = () => { if (window.confirm('Spielstand wirklich zurücksetzen?')) { setState({ category: null, stickers: DEFAULT_STICKERS, performance: {}, multiplicationGrid: {} }); localStorage.removeItem('mathemagic-save'); } };
+  const reset = () => { if (window.confirm('Spielstand wirklich zurücksetzen?')) { setState({ stickers: DEFAULT_STICKERS, performance: {}, multiplicationGrid: {} }); localStorage.removeItem('mathemagic-save'); } };
 
   // ── Win screen ──
   if (pendingWin) {
-    const b = BUILDINGS.find(b => b.category === pendingWin.category)!;
+    const g = GAMES[pendingWin.category];
     return (
-      <div className="win-screen" style={{ background: `linear-gradient(135deg, ${b.color}66 0%, ${b.roofColor}44 100%)` }}>
+      <div className="win-screen" style={{ background: `linear-gradient(135deg, ${g.color}66 0%, ${g.color}22 100%)` }}>
         <div className="win-card">
           <div className="win-sticker">{pendingWin.sticker}</div>
           <h2 className="win-title">Super gemacht! 🎉</h2>
-          <p className="win-subtitle">{b.icon} {b.label}</p>
-          <button className="win-btn" onClick={saveWin}>Zur Karte →</button>
+          <p className="win-subtitle">{g.icon} {g.label}</p>
+          <button className="win-btn" onClick={saveWin}>Weiter →</button>
         </div>
       </div>
     );
   }
 
   // ── Game routing ──
-  if (state.category === 'division')          return <DivisionGame onWin={onWin} onBack={onBack} />;
-  if (state.category === 'division-zerlegen') return <ZerlegeDivision onWin={onWin} onBack={onBack} />;
-  if (state.category === 'division-rest')     return <RestHaus onWin={onWin} onBack={onBack} />;
-  if (state.category === 'punkt-vor-strich')  return <PunktVorStrich onWin={onWin} onBack={onBack} />;
-  if (state.category === 'uhrzeit')           return <UhrenTurm onWin={onWin} onBack={onBack} />;
-  if (state.category === 'zahlen-fabrik')    return <FactoryGame onWin={onWin} onBack={onBack} />;
-  if (state.category === 'meister-zelt')     return <ComparisonGame onWin={onWin} onBack={onBack} />;
-  if (state.category === 'zahlen-mauer')     return <NumberWall onWin={onWin} onBack={onBack} />;
-  if (state.category === 'differenz-jagd')   return <DifferenceHunt onWin={onWin} onBack={onBack} />;
-  if (state.category === 'einmaleins-tafel') return <MultiplicationTafel grid={state.multiplicationGrid} onWin={onWin} onBack={onBack} onMarkCell={onMarkCell} />;
-  if (state.category === 'tausch-arena')     return <TauschArena onWin={onWin} onBack={onBack} />;
-  if (state.category)                        return <MathGame category={state.category} performance={state.performance} onAttempt={onAttempt} onWin={onWin} onBack={onBack} />;
+  // `key` startet das Spiel neu, wenn man ueber den Verlauf direkt von einem
+  // Spiel in ein anderes springt.
+  if (category === 'division')          return <DivisionGame key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'division-zerlegen') return <ZerlegeDivision key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'division-rest')     return <RestHaus key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'punkt-vor-strich')  return <PunktVorStrich key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'uhrzeit')           return <UhrenTurm key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'zahlen-fabrik')     return <FactoryGame key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'meister-zelt')      return <ComparisonGame key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'zahlen-mauer')      return <NumberWall key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'differenz-jagd')    return <DifferenceHunt key={category} onWin={onWin} onBack={onBack} />;
+  if (category === 'einmaleins-tafel')  return <MultiplicationTafel key={category} grid={state.multiplicationGrid} onWin={onWin} onBack={onBack} onMarkCell={onMarkCell} />;
+  if (category === 'tausch-arena')      return <TauschArena key={category} onWin={onWin} onBack={onBack} />;
+  if (category)                         return <MathGame key={category} category={category} performance={state.performance} onAttempt={onAttempt} onWin={onWin} onBack={onBack} />;
 
-  // ── MAP SCREEN ──
+  // ── Karte, Siedlung, Schule ──
+  if (route.screen === 'school') return <SchoolView stickers={state.stickers} onPlay={play} onBack={back} />;
+  if (route.screen === 'town') {
+    const town = TOWNS.find(t => t.id === route.town)!;
+    return <TownView town={town} stickers={state.stickers} totalStickers={totalStickers} onPlay={play} onBack={back} />;
+  }
   return (
-    <div className="map-screen">
-      {/* floating clouds */}
-      <div className="cloud map-cloud" style={{ top: '4%',  width: '140px', height: '55px', animationDelay: '0s'   }} />
-      <div className="cloud map-cloud" style={{ top: '10%', width: '95px',  height: '38px', animationDelay: '-7s'  }} />
-      <div className="cloud map-cloud" style={{ top: '6%',  width: '110px', height: '44px', animationDelay: '-14s' }} />
-
-      {/* header */}
-      <div className="map-header">
-        <div>
-          <h1 className="village-title map-title" style={{ margin: 0 }}>
-            Julia's Mathe-Dorf 🏘️
-          </h1>
-          <div className="map-subtitle">🐼 für die Panda-Klasse 3b</div>
-        </div>
-        <div className="map-score-pill">
-          {currentTier?.emoji ?? '🐼'}&nbsp;
-          <Star size={14} fill="#f59e0b" stroke="none" style={{ verticalAlign: 'middle' }} />
-          &nbsp;{totalStickers} Sticker
-        </div>
-      </div>
-
-      {/* map — auf schmalen Geräten horizontal wischbar */}
-      <div className="map-pan" ref={panRef}>
-      <div className="map-viewport">
-        <MapTerrain />
-
-        {/* buildings */}
-        {BUILDINGS.map(b => (
-          <MapBuilding
-            key={b.category}
-            label={b.label}
-            icon={b.icon}
-            color={b.color}
-            roofColor={b.roofColor}
-            shape={b.shape}
-            stickers={state.stickers[b.category] || []}
-            left={b.left}
-            top={b.top}
-            onClick={() => setCategory(b.category)}
-          />
-        ))}
-
-        {/* animal residents — unlock one per tier reached */}
-        {ANIMAL_SPOTS.map(spot => {
-          const unlocked = totalStickers >= spot.threshold;
-          const isCurrent = currentTier?.emoji === spot.emoji;
-          return (
-            <div
-              key={spot.emoji}
-              className={`map-animal ${unlocked ? (isCurrent ? 'current' : 'unlocked') : 'locked'}`}
-              style={{ left: spot.left, top: spot.top }}
-              title={unlocked ? spot.emoji : `🔒 ${spot.threshold} Sticker zum Freischalten`}
-            >
-              {spot.emoji}
-            </div>
-          );
-        })}
-
-        {/* running animal along the main road */}
-        <div className="map-runner">
-          <span>{currentTier?.emoji ?? '🐼'}</span>
-        </div>
-      </div>
-      </div>
-
-      <div className="map-swipe-hint">← wischen, um das ganze Dorf zu sehen →</div>
-
-      <button className="reset-btn" onClick={reset}><Trash2 size={14} /> Reset</button>
-    </div>
+    <WorldMap
+      stickers={state.stickers}
+      onOpenTown={town => go({ screen: 'town', town })}
+      onOpenSchool={() => go({ screen: 'school' })}
+      onReset={reset}
+    />
   );
 }
