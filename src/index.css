@@ -2016,3 +2016,5 @@ body.with-keypad .game-page {
 
 .iso-canvas { position: absolute; opacity: 0; transition: opacity 0.25s; }
 .iso-canvas.ready { opacity: 1; }
+
+.tk-container .star-progress { width: fit-content; }

@@ -53,6 +53,8 @@ export const NumberLine = ({ from, to, step, major, labels, marks }: {
   const shown = new Set(labels ?? ticks.filter(v => (v - from) % major === 0));
   return (
     <svg className="number-line" viewBox={`0 0 ${W} 120`} role="img" aria-label={`Zahlenstrahl von ${from} bis ${to}`}>
+      {/* Eigene weisse Flaeche: die Karos des Heftes passten nicht zu den Strichen und verwirrten. */}
+      <rect x="1" y="1" width={W - 2} height="118" rx="12" fill="#fff" stroke="#cbd5e1" strokeWidth="2" />
       <line x1={PAD - 12} y1={Y} x2={W - PAD + 18} y2={Y} stroke="#334155" strokeWidth="3" />
       <path d={`M ${W - PAD + 18} ${Y} l -10 -6 v 12 z`} fill="#334155" />
       {ticks.map(v => {
@@ -60,7 +62,7 @@ export const NumberLine = ({ from, to, step, major, labels, marks }: {
         return (
           <g key={v}>
             <line x1={x(v)} y1={Y - (big ? 14 : 7)} x2={x(v)} y2={Y + (big ? 14 : 7)} stroke="#334155" strokeWidth={big ? 2.5 : 1.5} />
-            {shown.has(v) && <text x={x(v)} y={Y + 36} textAnchor="middle" fontSize="19" fontWeight="700" fill="#1f2937">{v}</text>}
+            {shown.has(v) && <text x={x(v)} y={Y + 36} textAnchor="middle" fontSize={shown.size > 4 ? 16 : 19} fontWeight="700" fill="#1f2937">{v}</text>}
           </g>
         );
       })}

@@ -173,11 +173,14 @@ const nachfolger = (): Task => {
 };
 
 const folge = (): Task => {
-  const d = pick([2, 5, 10, 20, 25, 50, 100, 15, -10, -5, -100, -50]);
+  // Nur Schritte, die man im Kopf sicher gehen kann: 2 bis 9, ganze Zehner
+  // oder ganze Hunderter — vorwaerts und rueckwaerts. (+15, +25 waren zu schwer.)
+  const step = pick([2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 20, 50, 100, 100, 200]);
+  const d = Math.random() < 0.65 ? step : -step;
   const len = 6;
   const lo = d > 0 ? 0 : -d * (len - 1);
   const hi = d > 0 ? 1000 - d * (len - 1) : 1000;
-  const start = randInt(Math.max(lo, 1), hi);
+  const start = randInt(lo, hi);   // bei +200 bleibt nur der Start bei 0
   const nums = Array.from({ length: len }, (_, i) => start + i * d);
   return {
     id: `fo${start}${d}`, topic: 'folgen', prompt: 'Setze die Zahlenfolge fort.',
@@ -269,9 +272,9 @@ const ordnen = (): Task => {
 
 const strahlSetup = () => pick([
   // ganzer Tausender in Hunderterschritten
-  () => ({ from: 0, to: 1000, step: 50, major: 100, labels: [0, 500, 1000], pickFrom: 1, pickTo: 19, unit: 50 }),
+  () => ({ from: 0, to: 1000, step: 50, major: 100, labels: [0, 200, 400, 600, 800, 1000], pickFrom: 1, pickTo: 19, unit: 50 }),
   // ein Hunderter in Zehnerschritten
-  () => { const a = randInt(1, 9) * 100; return { from: a, to: a + 100, step: 10, major: 50, labels: [a, a + 100], pickFrom: 1, pickTo: 9, unit: 10 }; },
+  () => { const a = randInt(1, 9) * 100; return { from: a, to: a + 100, step: 10, major: 50, labels: [a, a + 50, a + 100], pickFrom: 1, pickTo: 9, unit: 10 }; },
   // zwanzig Einer
   () => { const a = randInt(10, 97) * 10; return { from: a, to: a + 20, step: 1, major: 10, labels: [a, a + 10, a + 20], pickFrom: 1, pickTo: 19, unit: 1 }; },
 ])();
@@ -297,7 +300,8 @@ const strahlLesen = (): Task => {
 
 const strahlWaehlen = (): Task => {
   const s = strahlSetup();
-  const ks = shuffle(Array.from({ length: s.pickTo - s.pickFrom + 1 }, (_, i) => s.pickFrom + i)).slice(0, 3).sort((a, b) => a - b);
+  const ks = shuffle(Array.from({ length: s.pickTo - s.pickFrom + 1 }, (_, i) => s.pickFrom + i)
+    .filter(k => !s.labels.includes(s.from + k * s.unit))).slice(0, 3).sort((a, b) => a - b);
   const vals = ks.map(k => s.from + k * s.unit);
   const target = randInt(0, 2);
   const names = ['A', 'B', 'C'];
@@ -358,7 +362,9 @@ const muenzenZaehlen = (): Task => {
 const THINGS = ['ein Heft', 'einen Bleistift', 'ein Lineal', 'einen Radiergummi', 'eine Brezel', 'ein Eis', 'einen Apfel', 'einen Malkasten', 'ein Buch', 'eine Mappe'];
 // Nur deutsche Vornamen.
 const NAMES = ['Julia', 'Lena', 'Mia', 'Ben', 'Emma', 'Paul', 'Nele', 'Max', 'Anna', 'Lukas'];
-const price = () => randInt(6, 199) * 5;   // 0,30 € bis 9,95 €, auf 5 ct
+// Preise in ganzen und halben Euro (0,50 € bis 9,50 €): Gerechnet wird ohne
+// krumme Cent-Betraege, geschrieben wird trotzdem mit Komma (z. B. 5,50 €).
+const price = () => randInt(1, 19) * 50;
 
 const einkauf = (): Task => {
   const name = pick(NAMES);
@@ -378,7 +384,7 @@ const einkauf = (): Task => {
     solution: `${euro(pa)} € + ${euro(pb)} € = ${euro(pa + pb)} €`,
     };
   }
-  const paid = [500, 1000, 2000].find(p => p > pa) ?? 2000;
+  const paid = [500, 1000, 2000].find(p => p > pa) ?? 2000;   // mit dem naechstgroesseren Schein
   return {
     id: `rg${pa}-${paid}`, topic: 'geld', prompt: 'Sachaufgabe',
     view: slot => (
