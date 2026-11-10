@@ -36,6 +36,9 @@ export interface PlacedTown {
 }
 export interface MapLayout {
   pieces: Piece[];
+  // Jede Stadt ab der Plateau-Oberkante als eigene Ebene — sie schwebt sanft
+  // ueber ihrem Erdsockel, der im Landschaftsbild bleibt.
+  townLayers: { id: TownId; pieces: Piece[] }[];
   towns: PlacedTown[];
   animals: { emoji: string; threshold: number; c: number; r: number; z: number }[];
 }
@@ -263,7 +266,16 @@ const build = (kind: LayoutKind, aspect: number): MapLayout => {
     return { emoji: a.emoji, threshold: a.threshold, c: t.c + a.c, r: t.r + a.r, z: t.h };
   });
 
-  return { pieces: buildCells(cells, houses), towns, animals };
+  const all = buildCells(cells, houses);
+  const townAt = (p: Piece) => towns.find(t => p.c >= t.c && p.c < t.c + t.size && p.r >= t.r && p.r < t.r + t.size && p.z >= t.h);
+  const townLayers = towns.map(t => ({ id: t.id, pieces: [] as Piece[] }));
+  const pieces: Piece[] = [];
+  for (const p of all) {
+    const t = townAt(p);
+    if (t) townLayers.find(l => l.id === t.id)!.pieces.push(p);
+    else pieces.push(p);
+  }
+  return { pieces, townLayers, towns, animals };
 };
 
 // Das Seitenverhaeltnis wird gerundet, damit nicht jedes Pixel beim Drehen

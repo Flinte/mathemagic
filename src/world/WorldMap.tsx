@@ -1,7 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Star, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { isSoundOn, setSoundOn } from '../games/shared';
-import { IsoScene } from '../iso/IsoScene';
+import { IsoScene, type At } from '../iso/IsoScene';
 import { TOWNS, type TownId } from './towns';
 import { currentAnimal } from './islands';
 import { mapLayout } from './mapLayout';
@@ -40,6 +40,28 @@ export const WorldMap = ({ stickers, onOpenTown, onOpenSchool, onReset }: Props)
   const layout = aspect ? mapLayout(aspect) : null;
 
   const open = (id: TownId) => (id === 'schule' ? onOpenSchool() : onOpenTown(id));
+
+  // Welche Stadt liegt unter Maus bzw. Finger? Jede auf ihrer eigenen Hoehe pruefen.
+  const townAt = (at: At) => layout?.towns.find(t => {
+    const [c, r] = at(t.h);
+    return c >= t.c && c < t.c + t.size && r >= t.r && r < t.r + t.size;
+  });
+  const [hover, setHover] = useState<TownId | null>(null);
+  const [pressed, setPressed] = useState<TownId | null>(null);
+  // Antippen: Stadt sinkt kurz ein wie ein Knopf, dann geht es hinein.
+  const press = (id: TownId) => {
+    setPressed(id);
+    window.setTimeout(() => { setPressed(null); open(id); }, 140);
+  };
+
+  // Jede Stadt schwebt auf und ab, leicht versetzt — nicht im Gleichschritt.
+  const bobDelay = (i: number) => `${-i * 0.47}s`;
+  const layers = useMemo(() => (layout?.townLayers ?? []).map((l, i) => ({
+    key: l.id,
+    pieces: l.pieces,
+    className: `town-layer ${hover === l.id ? 'hover' : ''} ${pressed === l.id ? 'pressed' : ''}`,
+    style: { animationDelay: bobDelay(i) },
+  })), [layout, hover, pressed]);
   const starsOf = (id: TownId) =>
     TOWNS.find(t => t.id === id)?.scene.houses.reduce((n, h) => n + (h.game ? stickers[h.game]?.length ?? 0 : 0), 0) ?? 0;
 
@@ -67,24 +89,12 @@ export const WorldMap = ({ stickers, onOpenTown, onOpenSchool, onReset }: Props)
             pieces={layout.pieces}
             maxScale={0.35}
             canvas
-            onPick={at => {
-              const t = layout.towns.find(t => { const [c, r] = at(t.h); return c >= t.c && c < t.c + t.size && r >= t.r && r < t.r + t.size; });
-              if (t) open(t.id);
-            }}
+            layers={layers}
+            className={hover ? 'over-town' : ''}
+            onPick={at => { const t = townAt(at); if (t) press(t.id); }}
+            onHover={at => { const id = at ? townAt(at)?.id ?? null : null; if (id !== hover) setHover(id); }}
             overlay={place => (
               <>
-                {/* Goldener, sanft pulsierender Rahmen um jedes Stadt-Plateau — zeigt
-                    auch auf dem Handy, wo man hintippen kann. Die Ecken liegen eine
-                    halbe Kachel ausserhalb der aeussersten Felder. */}
-                <svg className="town-glow" aria-hidden="true">
-                  {layout.towns.map(t => {
-                    const e = t.size - 0.5;
-                    const pts = [[-0.5, -0.5], [e, -0.5], [e, e], [-0.5, e]]
-                      .map(([dc, dr]) => place(t.c + dc, t.r + dr, t.h))
-                      .map(p => `${p.left},${p.top}`).join(' ');
-                    return <polygon key={t.id} points={pts} />;
-                  })}
-                </svg>
                 {layout.animals.filter(a => total >= a.threshold).map(a => {
                   const { left, top, scale } = place(a.c, a.r, a.z);
                   return <span key={a.emoji} className="iso-animal" style={{ left, top, fontSize: Math.max(14, 150 * scale) }}>{a.emoji}</span>;
@@ -98,10 +108,10 @@ export const WorldMap = ({ stickers, onOpenTown, onOpenSchool, onReset }: Props)
                   const n = starsOf(t.id);
                   return (
                     <span key={t.id}>
-                      <span className="town-flag" style={{ left: flag.left, top: flag.top }} aria-hidden="true">
+                      <span className="town-flag" style={{ left: flag.left, top: flag.top, animationDelay: bobDelay(layout.towns.indexOf(t)) }} aria-hidden="true">
                         <span className="town-flag-cloth">{ICONS[t.id]}</span>
                       </span>
-                      <button className="ortsschild" style={{ left: sign.left, top: sign.top }} onClick={() => open(t.id)}>
+                      <button className="ortsschild" style={{ left: sign.left, top: sign.top }} onClick={() => press(t.id)}>
                         <span className="ortsschild-board">
                           {NAMES[t.id]}
                           {n > 0 && <span className="ortsschild-stars"><Star size={10} fill="#f59e0b" stroke="none" />{n}</span>}

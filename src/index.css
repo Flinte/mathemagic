@@ -1513,7 +1513,7 @@ body {
 }
 
 .world-map { flex: 1; min-height: 0; position: relative; }
-.world-map .iso-scene { cursor: pointer; }
+.world-map .iso-scene.over-town { cursor: pointer; }
 
 /* Ortsschild an der vorderen Spitze jeder Stadt */
 .town-label {
@@ -2026,16 +2026,14 @@ body.with-keypad .game-page {
   .sound-btn { width: 32px; height: 32px; }
 }
 
-/* Leuchtrahmen der Staedte auf der Karte */
-.iso-overlay > svg.town-glow { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.town-glow polygon {
-  fill: rgba(253, 224, 71, 0.16);
-  stroke: #fde047; stroke-width: 3; stroke-linejoin: round;
-  filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.95)) drop-shadow(0 0 10px rgba(250, 204, 21, 0.6));
-  animation: townGlow 2.2s ease-in-out infinite;
-}
-@keyframes townGlow {
-  0%, 100% { stroke-opacity: 0.55; fill-opacity: 0.5; }
-  50% { stroke-opacity: 1; fill-opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) { .town-glow polygon { animation: none; } }
+
+
+/* ── Schwebende Staedte ──
+   Die Stadt (ab Plateau-Oberkante) wippt sanft auf und ab, die Fahne mit.
+   Maus darueber: hebt sich an. Antippen: sinkt kurz ein. */
+.town-layer { animation: townBob 3.2s ease-in-out infinite; transition: translate 0.18s ease-out; will-change: transform; pointer-events: none; }
+.town-layer.hover { translate: 0 -6px; }
+.town-layer.pressed { translate: 0 3px; transition-duration: 0.08s; }
+.town-flag { animation: townBob 3.2s ease-in-out infinite; }
+@keyframes townBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .town-layer, .town-flag { animation: none; } }
