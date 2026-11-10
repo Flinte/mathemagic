@@ -1,4 +1,4 @@
-import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { keypad, useKeypad, type Key } from './keypadStore';
 
 export interface NumInputHandle { focus: () => void; }
@@ -31,10 +31,12 @@ export const NumInput = ({
   const { activeId } = useKeypad();
 
   // Neueste Props fuer die Tasten-Verarbeitung. `pending` faengt Tastendruecke
-  // ab, die schneller kommen, als React neu zeichnet.
+  // ab, die schneller kommen, als React neu zeichnet. useLayoutEffect statt
+  // useEffect: laeuft direkt nach dem Zeichnen, sonst sieht ✓ in einem
+  // gedrosselten Tab noch die Werte von vorher.
   const latest = useRef({ onChange, onSubmit, readOnly, allowComma, maxLength });
   const pending = useRef(value);
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = { onChange, onSubmit, readOnly, allowComma, maxLength };
     pending.current = value;
   });
@@ -42,8 +44,9 @@ export const NumInput = ({
   // Liest nur Refs — bleibt ueber alle Renders gueltig.
   const press = useRef((key: Key) => {
     const p = latest.current;
-    if (p.readOnly) return;
+    // ✓ geht immer durch — nach dem Aufloesen bedeutet es "weiter".
     if (key === 'enter') { p.onSubmit?.(); return; }
+    if (p.readOnly) return;
     const v = pending.current;
     let next = v;
     if (key === 'back') next = v.slice(0, -1);

@@ -29,6 +29,7 @@ const parse = (hash: string): Route => {
 // Oeffnen eines Lesezeichens direkt auf ein Spiel.
 const parentOf = (r: Route): Route => {
   if (r.screen === 'game') {
+    if (r.game === 'probearbeit') return { screen: 'school' };
     const town = townOf(r.game);
     return town ? { screen: 'town', town: town.id } : { screen: 'world' };
   }

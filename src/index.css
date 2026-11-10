@@ -1672,7 +1672,7 @@ body {
   --kp-key: clamp(46px, 7.2svh, 68px);
   --kp-gap: 7px;
   --kp-pad: 9px;
-  --kp-height: calc(4 * var(--kp-key) + 3 * var(--kp-gap) + 2 * var(--kp-pad) + env(safe-area-inset-bottom));
+  --kp-height: calc(var(--kp-rows, 4) * var(--kp-key) + (var(--kp-rows, 4) - 1) * var(--kp-gap) + 2 * var(--kp-pad) + env(safe-area-inset-bottom));
   --kp-width: clamp(190px, 30vw, 300px);
 }
 .keypad {
@@ -1722,3 +1722,116 @@ body.with-keypad .game-page {
   body.with-keypad .game-page { padding-top: 62px; justify-content: flex-start; }
   body.with-keypad .game-page > :not(.game-header) { zoom: 0.68; }
 }
+
+/* ======================================================
+   ZAHLENRAUM BIS 1000 — Aufgaben-Karten
+   ====================================================== */
+.tk-container { max-width: 720px; width: 100%; }
+.tk-card {
+  display: flex; flex-direction: column; align-items: center; gap: 0.9rem;
+  width: 100%; box-sizing: border-box;
+}
+.tk-prompt { margin: 0; font-size: clamp(1.05rem, 4vw, 1.35rem); font-weight: 700; color: #334155; text-align: center; }
+.tk-view { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; width: 100%; }
+.tk-line {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.4rem;
+  font-size: clamp(1.4rem, 6vw, 2.2rem); font-weight: 700; color: #1f2937;
+}
+.tk-code { font-family: 'Courier New', monospace; background: #fef3c7; border-radius: 8px; padding: 2px 10px; letter-spacing: 1px; }
+.tk-word { font-size: clamp(1rem, 4.2vw, 1.5rem); background: #ede9fe; border-radius: 8px; padding: 4px 10px; word-break: break-all; }
+.tk-seq { font-variant-numeric: tabular-nums; }
+
+/* Eingabefeld in einer Aufgabe — Unterstrich wie im Heft */
+.tk-input {
+  min-width: 2.6ch; padding: 0 0.25em;
+  border-bottom: 4px solid #64748b; background: rgba(255,255,255,0.85);
+  border-radius: 8px 8px 0 0; font-weight: 800; color: #1f2937;
+}
+.tk-input.num-active { background: #fff; border-bottom-color: #1e88e5; box-shadow: 0 3px 10px rgba(30,136,229,0.25); }
+.tk-input.right { border-bottom-color: #22c55e; color: #15803d; background: #f0fdf4; }
+.tk-input.wrong { border-bottom-color: #ef4444; color: #b91c1c; background: #fef2f2; animation: zlShake 0.35s; }
+
+.tk-table { border-collapse: collapse; font-size: clamp(1.2rem, 5vw, 1.8rem); }
+.tk-table th { font-size: 0.55em; color: #475569; padding: 4px 8px; background: #e2e8f0; border: 2px solid #94a3b8; }
+.tk-table td { padding: 6px 10px; border: 2px solid #94a3b8; text-align: center; background: white; }
+
+.tk-story { font-size: clamp(1rem, 4vw, 1.3rem); line-height: 1.4; text-align: center; color: #1f2937; }
+.tk-story p { margin: 0.2rem 0; }
+
+.tk-choices { display: flex; flex-direction: column; gap: 0.6rem; width: 100%; max-width: 520px; }
+.tk-choice {
+  border: 3px solid #cbd5e1; background: white; border-radius: 14px;
+  padding: 0.7rem 1rem; font: inherit; font-size: clamp(1rem, 4vw, 1.3rem); font-weight: 700; color: #1f2937;
+  cursor: pointer; word-break: break-word;
+}
+.tk-choice:hover { border-color: #94a3b8; }
+.tk-choice.right { border-color: #22c55e; background: #f0fdf4; color: #15803d; }
+.tk-choice.wrong { border-color: #ef4444; background: #fef2f2; color: #b91c1c; text-decoration: line-through; }
+
+.tk-order { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: center; }
+.tk-order-num {
+  position: relative; min-width: 4.2em; padding: 0.7rem 0.8rem;
+  border: 3px solid #94a3b8; border-radius: 12px; background: white;
+  font: inherit; font-size: clamp(1.3rem, 5vw, 1.8rem); font-weight: 800; cursor: pointer;
+}
+.tk-order-num.done { border-color: #22c55e; background: #f0fdf4; color: #15803d; }
+.tk-order-num.shake { border-color: #ef4444; animation: zlShake 0.35s; }
+.tk-order-pos { position: absolute; top: -12px; left: -8px; background: #22c55e; color: white; border-radius: 999px; font-size: 0.7rem; padding: 2px 7px; }
+
+.tk-feedback-area { min-height: 2.6rem; display: flex; justify-content: center; width: 100%; }
+.tk-feedback { border-radius: 12px; padding: 0.6rem 1rem; font-weight: 700; text-align: center; }
+.tk-feedback.right { background: #dcfce7; color: #15803d; font-size: 1.3rem; }
+.tk-feedback.hint { background: #fef9c3; color: #854d0e; }
+.tk-feedback.wrong { background: #fee2e2; color: #991b1b; display: flex; flex-direction: column; gap: 0.6rem; align-items: center; }
+.tk-next {
+  border: none; border-radius: 999px; padding: 0.6rem 1.4rem;
+  background: #1e88e5; color: white; font: inherit; font-weight: 800; font-size: 1.1rem; cursor: pointer;
+  box-shadow: 0 3px 0 #1565c0;
+}
+.tk-next:active { transform: translateY(2px); box-shadow: none; }
+
+/* Stellenwerttafel mit Plaettchen */
+.place-table { display: grid; grid-template-columns: repeat(3, minmax(70px, 110px)); border: 3px solid #475569; border-radius: 10px; overflow: hidden; background: white; }
+.place-col { display: flex; flex-direction: column; border-left: 2px solid #94a3b8; }
+.place-col:first-child { border-left: none; }
+.place-head { background: #e2e8f0; text-align: center; font-weight: 800; font-size: 1.2rem; padding: 4px; border-bottom: 2px solid #94a3b8; }
+.place-dots {
+  display: grid; grid-template-columns: repeat(5, 14px); gap: 5px;
+  justify-content: center; align-content: start; padding: 10px 6px; min-height: 48px;
+}
+.place-dot { width: 14px; height: 14px; border-radius: 50%; background: #1f2937; }
+.place-buttons { display: flex; border-top: 2px solid #e2e8f0; }
+.place-buttons button {
+  flex: 1; border: none; background: #f8fafc; font: inherit; font-size: 1.6rem; font-weight: 800;
+  padding: 6px 0; cursor: pointer; color: #1e88e5; touch-action: manipulation;
+}
+.place-buttons button:first-child { color: #ef4444; border-right: 1px solid #e2e8f0; }
+.place-buttons button:disabled { color: #cbd5e1; cursor: default; }
+
+.number-line { width: 100%; max-width: 640px; height: auto; }
+
+.money-pile { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; max-width: 520px; }
+.money-note { width: 96px; }
+
+.cross {
+  display: grid; gap: 6px;
+  grid-template-areas: ". top ." "left center right" ". bottom .";
+  font-size: clamp(1.3rem, 5.5vw, 2rem); font-weight: 800;
+}
+.cross-cell { min-width: 3.6ch; padding: 6px; border: 2px solid #94a3b8; border-radius: 8px; background: white; display: flex; justify-content: center; }
+.cross-cell.center { background: #fef3c7; }
+
+.strip { display: flex; flex-wrap: wrap; justify-content: center; }
+.strip-cell {
+  min-width: 3.4ch; padding: 8px 6px; border: 2px solid #94a3b8; margin-left: -2px;
+  background: white; font-size: clamp(1.1rem, 4.5vw, 1.7rem); font-weight: 800; display: flex; justify-content: center;
+}
+
+/* Probearbeit */
+.exam-progress { align-self: center; font-weight: 800; color: #c62828; background: white; border-radius: 999px; padding: 4px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+.exam-result h2 { margin: 0; font-size: 1.8rem; color: #1f2937; }
+.exam-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; text-align: left; }
+.exam-list li { font-weight: 600; }
+.exam-list li.right { color: #15803d; }
+.exam-list li.wrong { color: #b91c1c; }
+.exam-tip { margin: 0; background: #fef9c3; color: #854d0e; border-radius: 10px; padding: 0.6rem 1rem; font-weight: 700; text-align: center; }

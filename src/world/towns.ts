@@ -24,10 +24,6 @@ export interface Town {
 // Baeume, Buesche und Wege behalten ihren eigenen Boden.
 export const TOWN_GROUND: Partial<Cell> = { floor: 'castle_center_N' };
 
-// Ein Spiel, das noch gebaut wird, steht als Geruest ohne Dach da.
-const baustelle = (c: number, r: number, game: GameId): TownHouse =>
-  ({ c, r, game, floors: ['structure_low'] });
-
 export const TOWNS: Town[] = [
   {
     id: 'plusminus', name: 'Plus-Minus-Hof', icon: '🌾',
@@ -92,17 +88,16 @@ export const TOWNS: Town[] = [
       ground: [
         'ggdggt',
         'gppppg',
-        'gpggpg',
-        'gpggpg',
+        'gpbgpg',
+        'gpgtpg',
         'gppppg',
         'Tgdgpg',
       ],
       houses: [
-        baustelle(0, 0, 'stellenwert'),
-        baustelle(3, 0, 'tausender-streifen'),
-        baustelle(2, 2, 'zahlenstrahl'),
-        baustelle(5, 3, 'runden'),
-        { c: 3, r: 2, floors: ['building_center', 'building_center'], roof: 'roof_slantBeige' },
+        { c: 0, r: 0, game: 'stellenwert', floors: ['building_doorWindowsBeige', 'building_windowsBeige', 'building_windowsBeige'], roof: 'roof_gableBeige' },
+        { c: 4, r: 0, game: 'tausender-streifen', floors: ['building_doorWindows', 'building_windows'], roof: 'roof_slantGreen' },
+        { c: 0, r: 3, game: 'zahlenstrahl', floors: ['structure_arch'], roof: 'roof_roundedGreen' },
+        { c: 5, r: 3, game: 'runden', floors: ['castle_tower', 'castle_window', 'castle_window'], roof: 'roof_pointBeige' },
       ],
     },
   },
@@ -117,7 +112,7 @@ export const TOWNS: Town[] = [
         'bgpgt',
       ],
       houses: [
-        baustelle(1, 0, 'geld'),
+        { c: 1, r: 0, game: 'geld', floors: ['building_doorWindowsBeige'], roof: 'roof_roundedGreen' },
         { c: 4, r: 1, game: 'uhrzeit', floors: ['building_door', 'building_windowsBeige', 'building_windowBeige'], roof: 'roof_churchBeige' },
         { c: 0, r: 2, game: 'sachaufgaben', floors: ['building_doorWindowsBeige'], roof: 'roof_gableBeige' },
       ],

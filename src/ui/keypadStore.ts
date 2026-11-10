@@ -59,8 +59,9 @@ export const keypad = {
   },
   press(key: Key) {
     // Ist gerade nichts aktiv, nimmt das erste beschreibbare Feld die Taste.
+    // ✓ braucht kein beschreibbares Feld: es landet notfalls beim ersten Feld.
     if (!active || !active.canFocus()) active = fields.find(f => f.canFocus()) ?? null;
-    active?.press(key);
+    (active ?? (key === 'enter' ? fields[0] : null))?.press(key);
     emit();
   },
 };

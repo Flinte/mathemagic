@@ -6,12 +6,14 @@ export type Category =
   | 'einmaleins-klein' | 'einmaleins-gross' | 'einmaleins-tafel'
   | 'division' | 'division-zerlegen' | 'division-rest' | 'tausch-arena' | 'kernaufgaben'
   | 'sachaufgaben' | 'platzhalter' | 'punkt-vor-strich' | 'uhrzeit'
-  | 'zahlen-fabrik' | 'meister-zelt' | 'differenz-jagd' | 'zahlen-mauer';
+  | 'zahlen-fabrik' | 'meister-zelt' | 'differenz-jagd' | 'zahlen-mauer'
+  // Zahlenraum bis 1000 — Mathearbeit am 17.11.2026
+  | 'stellenwert' | 'tausender-streifen' | 'zahlenstrahl' | 'runden' | 'geld' | 'probearbeit';
 
-// Spiele, die schon auf dem Lernzettel stehen, aber noch gebaut werden. Sie
-// erscheinen als Baustelle — so sieht man, was kommt, und der Lernzettel kann
-// sie schon verlinken.
-export type PlannedGame = 'stellenwert' | 'tausender-streifen' | 'zahlenstrahl' | 'runden' | 'geld' | 'probearbeit';
+// Spiele, die schon geplant, aber noch nicht gebaut sind, erscheinen als
+// Baustelle (Geruest im Dorf, ausgegrauter Knopf auf dem Lernzettel).
+// Gerade ist keines in Arbeit.
+export type PlannedGame = never;
 
 export type GameId = Category | PlannedGame;
 
@@ -45,12 +47,12 @@ export const GAMES: Record<GameId, GameInfo> = {
   'zahlen-fabrik':        { label: 'Zahlen-Fabrik',     icon: '⚙️', color: '#546e7a', klasse: 1 },
   'meister-zelt':         { label: 'Meister-Zelt',      icon: '🏆', color: '#f9a825', klasse: 2 },
 
-  stellenwert:            { label: 'Stellenwert-Haus',  icon: '🔢', color: '#5c6bc0', klasse: 3, planned: true },
-  'tausender-streifen':   { label: 'Tausender-Streifen', icon: '🧮', color: '#26a69a', klasse: 3, planned: true },
-  zahlenstrahl:           { label: 'Zahlenstrahl-Brücke', icon: '📏', color: '#8e24aa', klasse: 3, planned: true },
-  runden:                 { label: 'Runden-Turm',       icon: '🎯', color: '#ef6c00', klasse: 3, planned: true },
-  geld:                   { label: 'Geld-Laden',        icon: '💶', color: '#2e7d32', klasse: 3, planned: true },
-  probearbeit:            { label: 'Probearbeit',       icon: '📝', color: '#c62828', klasse: 3, planned: true },
+  stellenwert:            { label: 'Stellenwert-Haus',  icon: '🔢', color: '#5c6bc0', klasse: 3 },
+  'tausender-streifen':   { label: 'Tausender-Streifen', icon: '🧮', color: '#26a69a', klasse: 3 },
+  zahlenstrahl:           { label: 'Zahlenstrahl-Brücke', icon: '📏', color: '#8e24aa', klasse: 3 },
+  runden:                 { label: 'Runden-Turm',       icon: '🎯', color: '#ef6c00', klasse: 3 },
+  geld:                   { label: 'Geld-Laden',        icon: '💶', color: '#2e7d32', klasse: 3 },
+  probearbeit:            { label: 'Probearbeit',       icon: '📝', color: '#c62828', klasse: 3 },
 };
 
 export const isPlayable = (id: GameId): id is Category => !GAMES[id].planned;

@@ -8,6 +8,9 @@ import { keypad, useKeypad, type Key } from './keypadStore';
 export const Keypad = () => {
   const { visible, comma, submit } = useKeypad();
 
+  // Mit Komma und ✓ hat der Block eine fuenfte Reihe — die Seite muss mehr Platz lassen.
+  useEffect(() => { document.documentElement.style.setProperty('--kp-rows', comma && submit ? '5' : '4'); }, [comma, submit]);
+
   useEffect(() => {
     document.body.classList.toggle('with-keypad', visible);
     if (!visible) return;
