@@ -47,7 +47,7 @@ export const WorldMap = ({ stickers, onOpenTown, onOpenSchool, onReset }: Props)
     <div className="world-screen">
       <header className="world-header">
         <div>
-          <h1 className="village-title world-title">Julia's Mathe-Dorf</h1>
+          <h1 className="village-title world-title">Panda-Rechenland</h1>
           <div className="world-subtitle">🐼 für die Panda-Klasse 3b</div>
         </div>
         <div className="world-score">

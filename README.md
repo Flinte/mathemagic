@@ -1,4 +1,4 @@
-# Mathe-Dorf 🏘️
+# Panda-Rechenland 🐼
 
 Ein Rechenspiel für die Grundschule. Auf der Landkarte liegen erhöht kleine
 Siedlungen, durch Wege verbunden — Plus-Minus-Hof, Mal-Dorf, Teil-Dorf,
