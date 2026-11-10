@@ -7,7 +7,8 @@ import { LL, LR, UL, UR, pathTile, type Dir } from './tiles';
 //   .  nichts (Luft)        g  Wiese          p  Weg (verbindet sich selbst)
 //   o  Wasser               t  Wiese mit Baum
 //   T  Wiese mit Baumgruppe b  Wiese mit Busch d  Erde
-//   x  Wiese mit Baugeruest (fuer Haeuser, die noch kommen)
+//   x  Wiese mit Baugeruest   w  Weizenfeld     W  Brunnen
+//   P  grosse Kiefer
 export interface House {
   c: number; r: number;
   // Stockwerke von unten nach oben, ohne Richtungs-Endung, z. B. 'building_doorWindows'.
@@ -75,12 +76,15 @@ export const buildCells = (cells: Cells, houses: House[] = [], stilts = true): P
     } else if (ch === 'p') put(pathTile(mask(c, r, h)), h);
     else if (ch === 'o') put('water_center_N', top);
     else if (ch === 'd') put('dirt_center_N', h);
-    else put(ch === 'g' && cell.floor ? cell.floor : 'grass_center_N', h);
+    else put((ch === 'g' || ch === 'W') && cell.floor ? cell.floor : 'grass_center_N', h);
 
     if (ch === 't') put('tree_single_N', h + 1);
     if (ch === 'T') put('tree_multiple_N', h + 1);
     if (ch === 'b') put('rocks_grass_N', h + 1);
     if (ch === 'x') put('structure_low_N', h + 1);
+    if (ch === 'w') put('furrow_cropWheat_N', h + 1);
+    if (ch === 'W') put('well_E', h + 1);
+    if (ch === 'P') put('tree_pineLarge_N', h + 1);
 
     // Nur wo vorn nichts mehr kommt, sieht man die Stelzen ueberhaupt.
     if (stilts && (!get(c + 1, r) || !get(c, r + 1))) put('structure_high_N', Math.min(-1, top - 1));

@@ -1,6 +1,7 @@
 import type { Piece } from '../iso/IsoScene';
 import { addGrid, buildCells, cellKey, type Cells, type House } from '../iso/build';
 import { ANIMALS } from './islands';
+import { HALF_H, HALF_W } from '../iso/tiles';
 import { SCHOOL_SCENE, TOWNS, TOWN_GROUND, type TownId } from './towns';
 
 // Die grosse Landkarte: alle Staedte als erhoehte Plateaus auf einer gemeinsamen
@@ -26,10 +27,13 @@ const SLOTS: Record<LayoutKind, [TownId, number, number][]> = {
 export const layoutFor = (aspect: number): LayoutKind =>
   aspect < 0.65 ? 'tall' : aspect < 1.2 ? 'square' : aspect < 2.4 ? 'mid' : 'wide';
 
-const STEP = 8;   // Gitterfelder je Stadt-Schritt (Staedte sind bis zu 6 gross)
+const STEP = 11;  // Gitterfelder je Stadt-Schritt (Staedte sind bis zu 8 gross)
 const PAD = 3;    // Wiese rund um jede Stadt
 
-export interface PlacedTown { id: TownId; c: number; r: number; size: number; }
+export interface PlacedTown {
+  id: TownId; c: number; r: number; size: number; h: number;
+  foot: [number, number];   // Fuss der Rampe — dort steht das Ortsschild
+}
 export interface MapLayout {
   pieces: Piece[];
   towns: PlacedTown[];
@@ -37,6 +41,7 @@ export interface MapLayout {
 }
 
 const sceneOf = (id: TownId) => (id === 'schule' ? SCHOOL_SCENE : TOWNS.find(t => t.id === id)!.scene);
+const heightOf = (id: TownId) => TOWNS.find(t => t.id === id)?.height ?? 1;
 
 // Jede Stadt hat ihr Tor in der vordersten Reihe (letzte Zeile des Gitters):
 // das erste Wegfeld dort. Die Rampe liegt eine Zeile davor.
@@ -87,18 +92,16 @@ const route = (free: (c: number, r: number) => boolean, from: [number, number], 
   return [];
 };
 
-const build = (kind: LayoutKind): MapLayout => {
+const build = (kind: LayoutKind, aspect: number): MapLayout => {
   // 1. Staedte platzieren
   const towns: PlacedTown[] = SLOTS[kind].map(([id, i, j]) => {
     const size = sceneOf(id).ground.length;
-    const off = Math.floor((6 - size) / 2);   // kleinere Staedte mittig im Platz
-    return { id, c: Math.round((i + j) * STEP) + off, r: Math.round((j - i) * STEP) + off, size };
+    const off = Math.floor((8 - size) / 2);   // kleinere Staedte mittig im Platz
+    return { id, c: Math.round((i + j) * STEP) + off, r: Math.round((j - i) * STEP) + off, size, h: heightOf(id), foot: [0, 0] };
   });
   const minC = Math.min(...towns.map(t => t.c)) - PAD;
   const minR = Math.min(...towns.map(t => t.r)) - PAD;
   for (const t of towns) { t.c -= minC; t.r -= minR; }
-  const W = Math.max(...towns.map(t => t.c + t.size)) + PAD;
-  const H = Math.max(...towns.map(t => t.r + t.size)) + PAD;
 
   const inTown = (c: number, r: number) => towns.some(t => c >= t.c && c < t.c + t.size && r >= t.r && r < t.r + t.size);
   // Abstand (in Feldern) zur naechsten Stadt
@@ -109,35 +112,50 @@ const build = (kind: LayoutKind): MapLayout => {
   // Auf dem Bildschirm ist x ~ c − r und y ~ c + r; begrenzt wird also in
   // diesen beiden Richtungen, nicht in c und r.
   const corners = towns.flatMap(t => [[t.c, t.r], [t.c + t.size - 1, t.r], [t.c, t.r + t.size - 1], [t.c + t.size - 1, t.r + t.size - 1]]);
-  const u0 = Math.min(...corners.map(([c, r]) => c - r)) - PAD, u1 = Math.max(...corners.map(([c, r]) => c - r)) + PAD;
-  const v0 = Math.min(...corners.map(([c, r]) => c + r)) - PAD, v1 = Math.max(...corners.map(([c, r]) => c + r)) + PAD;
+  let u0 = Math.min(...corners.map(([c, r]) => c - r)) - PAD, u1 = Math.max(...corners.map(([c, r]) => c - r)) + PAD;
+  let v0 = Math.min(...corners.map(([c, r]) => c + r)) - PAD, v1 = Math.max(...corners.map(([c, r]) => c + r)) + PAD;
+  // Das Land waechst links/rechts oder oben/unten, bis es das Seitenverhaeltnis
+  // des Bildschirms hat — sonst bliebe neben der Karte leerer Himmel.
+  const widthPx = () => (u1 - u0) * HALF_W + 2 * HALF_W;
+  const heightPx = () => (v1 - v0) * HALF_H + 2 * HALF_H + 2 * 101;
+  if (widthPx() / heightPx() < aspect) {
+    const extra = Math.ceil((aspect * heightPx() - widthPx()) / HALF_W / 2);
+    u0 -= extra; u1 += extra;
+  } else {
+    const extra = Math.ceil((widthPx() / aspect - heightPx()) / HALF_H / 2);
+    v0 -= extra; v1 += extra;
+  }
   const cells: Cells = new Map();
-  for (let r = -W; r < H + W; r++) for (let c = -H; c < W + H; c++) {
-    const u = c - r, v = c + r;
-    if (u >= u0 && u <= u1 && v >= v0 && v <= v1) cells.set(cellKey(c, r), { ch: 'g', h: 0 });
+  for (let u = u0; u <= u1; u++) for (let v = v0; v <= v1; v++) {
+    if ((u + v) % 2 !== 0) continue;   // c und r muessen ganzzahlig sein
+    cells.set(cellKey((u + v) / 2, (v - u) / 2), { ch: 'g', h: 0 });
   }
 
   // Seen dort, wo weit und breit keine Stadt ist — Teich-Mittelpunkte aus dem
   // festen Zufall, je ein kleines Rund drumherum.
+  // Am Kartenrand keine Seen — dort sahen die Wasserwuerfel aus wie Glas.
+  const inner = (c: number, r: number) => c - r > u0 + 2 && c - r < u1 - 2 && c + r > v0 + 2 && c + r < v1 - 3;
   for (const k of cells.keys()) {
     const [c, r] = k.split(',').map(Number);
-    if (noise(c * 3 + 1, r * 7 + 2) > 0.035 || townDist(c, r) < 5) continue;
+    if (noise(c * 3 + 1, r * 7 + 2) > 0.018 || townDist(c, r) < 5 || !inner(c, r)) continue;
     for (let dr = -1; dr <= 1; dr++) for (let dc = -2; dc <= 1; dc++) {
       const n = cells.get(cellKey(c + dc, r + dr));
-      if (n && townDist(c + dc, r + dr) >= 3 && Math.abs(dc + 0.5) + Math.abs(dr) < 2.6) n.ch = 'o';
+      if (n && townDist(c + dc, r + dr) >= 3 && inner(c + dc, r + dr) && Math.abs(dc + 0.5) + Math.abs(dr) < 2.6) n.ch = 'o';
     }
   }
 
-  // 3. Staedte als Plateau eine Stufe hoeher, Rampe vor dem Tor
+  // 3. Staedte als Plateau (meist eine Stufe hoch), Rampen vor dem Tor —
+  // je Stufe eine, der Rätsel-Berg hat also eine Treppe aus zwei Rampen.
   const houses: House[] = [];
   const feet: [number, number][] = [];
   for (const t of towns) {
     const scene = sceneOf(t.id);
-    addGrid(cells, scene.ground, 1, t.c, t.r, TOWN_GROUND);
+    addGrid(cells, scene.ground, t.h, t.c, t.r, TOWN_GROUND);
     for (const h of scene.houses ?? []) houses.push({ ...h, c: h.c + t.c, r: h.r + t.r });
     const g = gateOf(scene.ground);
-    cells.set(cellKey(t.c + g.c, t.r + g.r + 1), { ch: 'p', h: 0, ramp: 'E' });
-    feet.push([t.c + g.c, t.r + g.r + 2]);
+    for (let k = 0; k < t.h; k++) cells.set(cellKey(t.c + g.c, t.r + g.r + 1 + k), { ch: 'p', h: t.h - 1 - k, ramp: 'E' });
+    t.foot = [t.c + g.c, t.r + g.r + 1 + t.h];
+    feet.push(t.foot);
   }
 
   // 4. Wege: jede Stadt an die naechste schon verbundene (wie ein Spannbaum)
@@ -177,14 +195,19 @@ const build = (kind: LayoutKind): MapLayout => {
 
   const animals = ANIMALS.map(a => {
     const t = towns.find(t => t.id === a.town)!;
-    return { emoji: a.emoji, threshold: a.threshold, c: t.c + a.c, r: t.r + a.r, z: 2 };
+    return { emoji: a.emoji, threshold: a.threshold, c: t.c + a.c, r: t.r + a.r, z: t.h };
   });
 
   return { pieces: buildCells(cells, houses), towns, animals };
 };
 
-const cache = new Map<LayoutKind, MapLayout>();
-export const mapLayout = (kind: LayoutKind) => {
-  if (!cache.has(kind)) cache.set(kind, build(kind));
-  return cache.get(kind)!;
+// Das Seitenverhaeltnis wird gerundet, damit nicht jedes Pixel beim Drehen
+// oder Groessenaendern eine neue Karte baut.
+const cache = new Map<string, MapLayout>();
+export const mapLayout = (aspect: number) => {
+  const kind = layoutFor(aspect);
+  const a = Math.round(aspect * 10) / 10;
+  const key = `${kind}:${a}`;
+  if (!cache.has(key)) cache.set(key, build(kind, a));
+  return cache.get(key)!;
 };
