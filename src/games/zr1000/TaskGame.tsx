@@ -10,31 +10,44 @@ type Mode = 'practice' | 'exam';
 type Phase = 'ask' | 'right' | 'reveal';
 
 // ── Eine Aufgabe ──
-// Ueben: zwei Versuche, danach wird der Loesungsweg gezeigt.
-// Probearbeit: ein Versuch, wie in der echten Arbeit.
+// Ueben: zwei Versuche. Nach dem ersten Fehler bleiben die falschen Zahlen rot
+// stehen und der Tipp erscheint; nach dem zweiten steht die Loesung in den
+// Feldern. Mit "Hilfe" kommt man jederzeit an Tipp und Loesung.
+// Probearbeit: ein Versuch, keine Hilfe — wie in der echten Arbeit.
+type Mark = '' | 'right' | 'wrong' | 'missing';
+
 const TaskCard = ({ task, mode, onDone }: { task: Task; mode: Mode; onDone: (right: boolean) => void }) => {
   const n = task.answers?.length ?? 0;
   const [vals, setVals] = useState<string[]>(() => Array(n).fill(''));
-  const [marks, setMarks] = useState<('' | 'right' | 'wrong')[]>(() => Array(n).fill(''));
+  const [marks, setMarks] = useState<Mark[]>(() => Array(n).fill(''));
   const [tries, setTries] = useState(0);
   const [phase, setPhase] = useState<Phase>('ask');
+  const [showHint, setShowHint] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [picked, setPicked] = useState<number[]>([]);         // Auswahl bzw. Reihenfolge
   const [counts, setCounts] = useState<[number, number, number]>([0, 0, 0]);
+  const [shake, setShake] = useState(-1);
   const refs = useRef<(NumInputHandle | null)[]>([]);
   const timer = useRef(0);
   useEffect(() => () => clearTimeout(timer.current), []);
+  const practice = mode === 'practice';
 
   const right = () => {
     playSound('correct');
     setPhase('right');
     timer.current = window.setTimeout(() => onDone(true), 900);
   };
+  const reveal = () => {
+    setPhase('reveal');
+    if (task.build !== undefined) setCounts([Math.floor(task.build / 100), Math.floor(task.build / 10) % 10, task.build % 10]);
+  };
   // Ein Fehlversuch. Gibt true zurueck, wenn danach aufgeloest wird.
   const wrong = () => {
     playSound('wrong');
     const t = tries + 1;
     setTries(t);
-    if (mode === 'exam' || t >= 2) { setPhase('reveal'); return true; }
+    if (!practice || t >= 2) { reveal(); return true; }
+    setShowHint(true);
     return false;
   };
 
@@ -42,33 +55,44 @@ const TaskCard = ({ task, mode, onDone }: { task: Task; mode: Mode; onDone: (rig
   const submit = () => {
     if (phase === 'reveal') { onDone(false); return; }
     if (phase !== 'ask' || !task.answers) return;
-    const empty = vals.findIndex((v, i) => v === '' && marks[i] !== 'right');
-    if (empty >= 0) { refs.current[empty]?.focus(); return; }
+    const empty = vals.map((v, i) => v === '' && marks[i] !== 'right');
+    if (empty.some(Boolean)) {
+      setMissing(true);
+      setMarks(m => m.map((x, i) => (empty[i] ? 'missing' : x)));
+      refs.current[empty.indexOf(true)]?.focus();
+      return;
+    }
+    setMissing(false);
     const ok = task.answers.map((a, i) => isRight(vals[i], a, task.comma));
     setMarks(ok.map(o => (o ? 'right' : 'wrong')));
     if (ok.every(Boolean)) { right(); return; }
-    if (wrong()) return;
-    // Zweiter Versuch: falsche Felder leeren, das erste davon aktivieren.
-    timer.current = window.setTimeout(() => {
-      setVals(v => v.map((x, i) => (ok[i] ? x : '')));
-      setMarks(ok.map(o => (o ? 'right' : '')));
-      refs.current[ok.indexOf(false)]?.focus();
-    }, 700);
+    if (!wrong()) refs.current[ok.indexOf(false)]?.focus();
   };
 
-  const slot = (i: number) => (
-    <NumInput
-      ref={el => { refs.current[i] = el; }}
-      value={vals[i]}
-      onChange={v => { setVals(p => p.map((x, j) => (j === i ? v : x))); setMarks(p => p.map((x, j) => (j === i && x === 'wrong' ? '' : x))); }}
-      onSubmit={submit}
-      readOnly={phase !== 'ask' || marks[i] === 'right'}
-      autoFocus={i === 0}
-      allowComma={task.comma}
-      maxLength={task.comma ? 6 : 4}
-      className={`tk-input ${marks[i]}`}
-    />
-  );
+  // Tippen in ein rotes Feld ersetzt die falsche Zahl, statt sie zu verlaengern.
+  const type = (i: number, v: string) => {
+    const was = vals[i];
+    const next = marks[i] === 'wrong' ? (v.length > was.length ? v.slice(was.length) : '') : v;
+    setVals(p => p.map((x, j) => (j === i ? next : x)));
+    setMarks(p => p.map((x, j) => (j === i && (x === 'wrong' || x === 'missing') ? '' : x)));
+  };
+
+  const slot = (i: number) => {
+    const solved = phase === 'reveal' && marks[i] !== 'right';
+    return (
+      <NumInput
+        ref={el => { refs.current[i] = el; }}
+        value={solved ? task.answers![i] : vals[i]}
+        onChange={v => type(i, v)}
+        onSubmit={submit}
+        readOnly={phase !== 'ask' || marks[i] === 'right'}
+        autoFocus={i === 0}
+        allowComma={task.comma}
+        maxLength={task.comma ? 6 : 4}
+        className={`tk-input ${solved ? 'solution' : marks[i]}`}
+      />
+    );
+  };
 
   // ── Auswahl ──
   const choose = (i: number) => {
@@ -80,7 +104,6 @@ const TaskCard = ({ task, mode, onDone }: { task: Task; mode: Mode; onDone: (rig
 
   // ── Ordnen ──
   const sorted = task.order ? [...task.order].sort((a, b) => a - b) : [];
-  const [shake, setShake] = useState(-1);
   const tapOrder = (v: number) => {
     if (phase !== 'ask' || picked.includes(v)) return;
     if (v === sorted[picked.length]) {
@@ -100,6 +123,9 @@ const TaskCard = ({ task, mode, onDone }: { task: Task; mode: Mode; onDone: (rig
     if (counts[0] * 100 + counts[1] * 10 + counts[2] === task.build) right();
     else wrong();
   };
+
+  // Hilfe-Knopf: erst der Tipp, dann die Loesung
+  const help = () => { if (!showHint) setShowHint(true); else reveal(); };
 
   return (
     <div className="tk-card">
@@ -137,12 +163,18 @@ const TaskCard = ({ task, mode, onDone }: { task: Task; mode: Mode; onDone: (rig
 
       <div className="tk-feedback-area">
         {phase === 'right' && <div className="tk-feedback right">Richtig! 🎉</div>}
-        {phase === 'ask' && tries === 1 && <div className="tk-feedback hint">Fast! Schau noch einmal genau hin. 🔍</div>}
+        {phase === 'ask' && missing && <div className="tk-feedback hint">Es fehlt noch eine Zahl. ✏️</div>}
+        {phase === 'ask' && !missing && tries === 1 && <div className="tk-feedback hint">Nicht ganz — {n > 0 ? 'die roten Zahlen stimmen noch nicht.' : 'versuch es noch einmal.'}</div>}
+        {phase === 'ask' && showHint && <div className="tk-feedback tip">💡 {task.hint}</div>}
         {phase === 'reveal' && (
           <div className="tk-feedback wrong">
             <span>So ist es richtig: <b>{task.solution}</b></span>
+            {practice && <span className="tk-tip-small">💡 {task.hint}</span>}
             <button className="tk-next" onClick={() => onDone(false)}>Weiter →</button>
           </div>
+        )}
+        {phase === 'ask' && practice && (
+          <button className="tk-help" onClick={help}>{showHint ? '👀 Lösung zeigen' : '💡 Hilfe'}</button>
         )}
       </div>
     </div>

@@ -113,11 +113,13 @@ export const MoneyPile = ({ items }: { items: number[] }) => (
 // ── Nachbar-Kreuz wie im Heft: oben −10, links −1, rechts +1, unten +10 ──
 export const Cross = ({ top, left, center, right, bottom }: Record<'top' | 'left' | 'center' | 'right' | 'bottom', ReactNode>) => (
   <div className="cross">
-    <div className="cross-cell" style={{ gridArea: 'top' }}>{top}</div>
-    <div className="cross-cell" style={{ gridArea: 'left' }}>{left}</div>
+    {/* Kleine Rechenzeichen an den Armen: ohne sie war nicht klar, dass oben
+        10 weniger und unten 10 mehr gehoert. */}
+    <div className="cross-cell" style={{ gridArea: 'top' }}><span className="cross-op">−10</span>{top}</div>
+    <div className="cross-cell" style={{ gridArea: 'left' }}><span className="cross-op">−1</span>{left}</div>
     <div className="cross-cell center" style={{ gridArea: 'center' }}>{center}</div>
-    <div className="cross-cell" style={{ gridArea: 'right' }}>{right}</div>
-    <div className="cross-cell" style={{ gridArea: 'bottom' }}>{bottom}</div>
+    <div className="cross-cell" style={{ gridArea: 'right' }}><span className="cross-op">+1</span>{right}</div>
+    <div className="cross-cell" style={{ gridArea: 'bottom' }}><span className="cross-op">+10</span>{bottom}</div>
   </div>
 );
 

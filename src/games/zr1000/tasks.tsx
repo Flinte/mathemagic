@@ -43,6 +43,7 @@ export interface Task {
   order?: number[];           // diese Zahlen von klein nach gross antippen
   build?: number;             // diese Zahl mit Plaettchen legen
   solution: string;           // wird nach einem Fehler gezeigt
+  hint: string;               // Tipp: wie man auf die Loesung kommt, ohne sie zu verraten
 }
 
 const digits = (n: number) => [Math.floor(n / 100), Math.floor(n / 10) % 10, n % 10] as [number, number, number];
@@ -67,7 +68,8 @@ const geheimschrift = (): Task => {
   return {
     id: `gs${code}`, topic: 'stellenwert', prompt: 'Geheimschrift: Welche Zahl ist das?',
     view: slot => <div className="tk-line"><span className="tk-code">{code}</span> = {slot(0)}</div>,
-    answers: [String(n)], solution: `${code} = ${n}`,
+    answers: [String(n)], hint: 'H heißt Hunderter, Z Zehner, E Einer. Schreibe erst die Hunderter, dann die Zehner, dann die Einer. Fehlt eine Stelle, schreibst du dort eine 0.',
+    solution: `${code} = ${n}`,
   };
 };
 
@@ -77,7 +79,8 @@ const zerlegen = (): Task => {
   return {
     id: `zl${n}`, topic: 'stellenwert', prompt: 'Zerlege in Hunderter, Zehner und Einer.',
     view: slot => <div className="tk-line">{n} = {slot(0)} H {slot(1)} Z {slot(2)} E</div>,
-    answers: [String(h), String(z), String(e)], solution: `${n} = ${h} H ${z} Z ${e} E`,
+    answers: [String(h), String(z), String(e)], hint: 'Die erste Ziffer sagt, wie viele Hunderter es sind, die zweite die Zehner, die letzte die Einer.',
+    solution: `${n} = ${h} H ${z} Z ${e} E`,
   };
 };
 
@@ -86,7 +89,8 @@ const plaettchenLesen = (): Task => {
   return {
     id: `pl${n}`, topic: 'plaettchen', prompt: 'Welche Zahl liegt in der Stellenwerttafel?',
     view: slot => <><PlaceTable counts={digits(n)} /><div className="tk-line">Zahl: {slot(0)}</div></>,
-    answers: [String(n)], solution: `Die Zahl ist ${n}.`,
+    answers: [String(n)], hint: 'Zähle die Plättchen in jeder Spalte. Links die Hunderter, in der Mitte die Zehner, rechts die Einer.',
+    solution: `Die Zahl ist ${n}.`,
   };
 };
 
@@ -95,7 +99,8 @@ const plaettchenLegen = (): Task => {
   const [h, z, e] = digits(n);
   return {
     id: `pb${n}`, topic: 'plaettchen', prompt: `Lege die Zahl ${n} mit Plättchen.`,
-    build: n, solution: `${n}: ${h} Hunderter, ${z} Zehner, ${e} Einer`,
+    build: n, hint: 'Lege in jede Spalte so viele Plättchen, wie die Ziffer sagt: links Hunderter, Mitte Zehner, rechts Einer. Mit + legst du eins dazu, mit − nimmst du eins weg.',
+    solution: `${n}: ${h} Hunderter, ${z} Zehner, ${e} Einer`,
   };
 };
 
@@ -104,7 +109,8 @@ const zahlwortLesen = (): Task => {
   return {
     id: `zw${n}`, topic: 'zahlwort', prompt: 'Schreibe das Zahlwort als Zahl.',
     view: slot => <div className="tk-line"><span className="tk-word">{numberWord(n)}</span> = {slot(0)}</div>,
-    answers: [String(n)], solution: `${numberWord(n)} = ${n}`,
+    answers: [String(n)], hint: 'Zerlege das Wort: erst kommen die Hunderter, dann die Einer und zum Schluss die Zehner. Bei 324 sagt man drei-hundert-vier-und-zwanzig.',
+    solution: `${numberWord(n)} = ${n}`,
   };
 };
 
@@ -120,7 +126,8 @@ const zahlwortWaehlen = (): Task => {
   const options = shuffle([n, dreher, others[0]]).map(numberWord);
   return {
     id: `zc${n}`, topic: 'zahlwort', prompt: `Wie heißt die Zahl ${n}?`,
-    choice: { options, correct: options.indexOf(numberWord(n)) }, solution: `${n} = ${numberWord(n)}`,
+    choice: { options, correct: options.indexOf(numberWord(n)) }, hint: 'Achte auf die Reihenfolge: Im Zahlwort kommen die Einer vor den Zehnern (vierundzwanzig = 24).',
+    solution: `${n} = ${numberWord(n)}`,
   };
 };
 
@@ -135,16 +142,18 @@ const streifen = (): Task => {
   return {
     id: `st${start}-${step}`, topic: 'streifen', prompt: 'Ergänze den Ausschnitt aus dem Tausenderstreifen.',
     view: slot => <Strip cells={nums.map((v, i) => (gaps.includes(i) ? slot(gaps.indexOf(i)) : v))} />,
-    answers: gaps.map(i => String(nums[i])), solution: nums.join(', '),
+    answers: gaps.map(i => String(nums[i])), hint: step === 1 ? 'Im Tausenderstreifen kommt nach jeder Zahl die nächste: immer 1 mehr.' : 'Hier geht es in Zehnerschritten weiter: immer 10 mehr.',
+    solution: nums.join(', '),
   };
 };
 
 const nachbarKreuz = (): Task => {
   const n = randInt(11, 989);
   return {
-    id: `kr${n}`, topic: 'streifen', prompt: 'Ergänze die Nachbarzahlen wie im Tausenderstreifen.',
+    id: `kr${n}`, topic: 'streifen', prompt: 'Ergänze die Nachbarzahlen: links und rechts 1 weniger und 1 mehr, oben und unten 10 weniger und 10 mehr.',
     view: slot => <Cross top={slot(0)} left={slot(1)} center={<b>{n}</b>} right={slot(2)} bottom={slot(3)} />,
     answers: [n - 10, n - 1, n + 1, n + 10].map(String),
+    hint: 'Links steht 1 weniger, rechts 1 mehr. Oben steht 10 weniger, unten 10 mehr.',
     solution: `oben ${n - 10}, links ${n - 1}, rechts ${n + 1}, unten ${n + 10}`,
   };
 };
@@ -158,7 +167,8 @@ const nachfolger = (): Task => {
       <table className="tk-table"><thead><tr><th>Vorgänger</th><th>Zahl</th><th>Nachfolger</th></tr></thead>
         <tbody><tr><td>{slot(0)}</td><td><b>{n}</b></td><td>{slot(1)}</td></tr></tbody></table>
     ),
-    answers: [String(n - 1), String(n + 1)], solution: `${n - 1} – ${n} – ${n + 1}`,
+    answers: [String(n - 1), String(n + 1)], hint: 'Der Vorgänger ist 1 weniger, der Nachfolger ist 1 mehr. Pass auf, wenn ein neuer Zehner oder Hunderter beginnt.',
+    solution: `${n - 1} – ${n} – ${n + 1}`,
   };
 };
 
@@ -172,7 +182,8 @@ const folge = (): Task => {
   return {
     id: `fo${start}${d}`, topic: 'folgen', prompt: 'Setze die Zahlenfolge fort.',
     view: slot => <div className="tk-line tk-seq">{nums.slice(0, 4).join(', ')}, {slot(0)}, {slot(1)}</div>,
-    answers: [String(nums[4]), String(nums[5])], solution: `Immer ${d > 0 ? '+' : '−'}${Math.abs(d)}: ${nums.join(', ')}`,
+    answers: [String(nums[4]), String(nums[5])], hint: 'Rechne aus, wie viel von einer Zahl zur nächsten dazukommt oder weggeht. Dann geht es genauso weiter.',
+    solution: `Immer ${d > 0 ? '+' : '−'}${Math.abs(d)}: ${nums.join(', ')}`,
   };
 };
 
@@ -188,7 +199,8 @@ const nachbarzehner = (): Task => {
       <table className="tk-table"><thead><tr><th>Nachbarzehner</th><th>Zahl</th><th>Nachbarzehner</th></tr></thead>
         <tbody><tr><td>{slot(0)}</td><td><b>{n}</b></td><td>{slot(1)}</td></tr></tbody></table>
     ),
-    answers: [String(lo), String(hi)], solution: `${lo} – ${n} – ${hi}`,
+    answers: [String(lo), String(hi)], hint: 'Nachbarzehner sind die glatten Zehnerzahlen direkt davor und danach. Ist die Zahl selbst glatt, nimmst du 10 weniger und 10 mehr.',
+    solution: `${lo} – ${n} – ${hi}`,
   };
 };
 
@@ -204,7 +216,8 @@ const nachbarhunderter = (): Task => {
       <table className="tk-table"><thead><tr><th>Nachbarhunderter</th><th>Zahl</th><th>Nachbarhunderter</th></tr></thead>
         <tbody><tr><td>{slot(0)}</td><td><b>{n}</b></td><td>{slot(1)}</td></tr></tbody></table>
     ),
-    answers: [String(lo), String(hi)], solution: `${lo} – ${n} – ${hi}`,
+    answers: [String(lo), String(hi)], hint: 'Nachbarhunderter sind die glatten Hunderterzahlen direkt davor und danach. Ist die Zahl selbst glatt, nimmst du 100 weniger und 100 mehr.',
+    solution: `${lo} – ${n} – ${hi}`,
   };
 };
 
@@ -225,7 +238,8 @@ const runden = (to: 10 | 100) => (): Task => {
         <div className="tk-line">{n} ≈ {slot(0)}</div>
       </>
     ),
-    answers: [String(r)], solution: `${n} ≈ ${r}, weil ${n} näher an ${r} liegt${n % to === to / 2 ? ' (bei 5 wird aufgerundet)' : ''}.`,
+    answers: [String(r)], hint: to === 10 ? 'Schau auf die Einer: Bei 0, 1, 2, 3, 4 rundest du ab, bei 5, 6, 7, 8, 9 rundest du auf.' : 'Schau auf die Zehner: Bei 0 bis 4 rundest du ab, bei 5 bis 9 rundest du auf.',
+    solution: `${n} ≈ ${r}, weil ${n} näher an ${r} liegt${n % to === to / 2 ? ' (bei 5 wird aufgerundet)' : ''}.`,
   };
 };
 
@@ -246,7 +260,8 @@ const ordnen = (): Task => {
   const sorted = [...nums].sort((a, b) => a - b);
   return {
     id: `or${sorted.join('-')}`, topic: 'ordnen', prompt: 'Tippe die Zahlen der Größe nach an. Beginne mit der kleinsten.',
-    order: shuffle(nums), solution: sorted.join(' < '),
+    order: shuffle(nums), hint: 'Vergleiche zuerst die Hunderter. Sind sie gleich, vergleiche die Zehner, dann die Einer.',
+    solution: sorted.join(' < '),
   };
 };
 
@@ -275,7 +290,8 @@ const strahlLesen = (): Task => {
         <div className="tk-line">A = {slot(0)} &nbsp; B = {slot(1)}</div>
       </>
     ),
-    answers: vals.map(String), solution: `A = ${vals[0]}, B = ${vals[1]}`,
+    answers: vals.map(String), hint: 'Schau, welche Zahlen beschriftet sind, und zähle, wie viel ein kleiner Strich bedeutet.',
+    solution: `A = ${vals[0]}, B = ${vals[1]}`,
   };
 };
 
@@ -290,7 +306,8 @@ const strahlWaehlen = (): Task => {
     id: `sw${vals.join('-')}`, topic: 'strahl', prompt: `Welcher Pfeil zeigt auf ${vals[target]}?`,
     view: () => <NumberLine from={s.from} to={s.to} step={s.step} major={s.major} labels={s.labels}
       marks={vals.map((v, i) => ({ value: v, label: names[i], color: colors[i] }))} />,
-    choice: { options: names, correct: target }, solution: `${names[target]} zeigt auf ${vals[target]}.`,
+    choice: { options: names, correct: target }, hint: 'Schau, welche Zahlen beschriftet sind, und zähle, wie viel ein kleiner Strich bedeutet.',
+    solution: `${names[target]} zeigt auf ${vals[target]}.`,
   };
 };
 
@@ -301,7 +318,8 @@ const kommaSchreiben = (): Task => {
   return {
     id: `ks${e}-${c}`, topic: 'geld', prompt: 'Schreibe mit Komma.',
     view: slot => <div className="tk-line">{e > 0 && `${e} € `}{c} ct = {slot(0)} €</div>,
-    answers: [euro(e * 100 + c)], comma: true, solution: `${e > 0 ? `${e} € ` : ''}${c} ct = ${euro(e * 100 + c)} €`,
+    answers: [euro(e * 100 + c)], comma: true, hint: '1 € sind 100 ct. Nach dem Komma stehen immer zwei Ziffern für die Cent: 5 ct schreibt man als 0,05 €.',
+    solution: `${e > 0 ? `${e} € ` : ''}${c} ct = ${euro(e * 100 + c)} €`,
   };
 };
 
@@ -310,7 +328,8 @@ const kommaLesen = (): Task => {
   return {
     id: `kl${e}-${c}`, topic: 'geld', prompt: 'Schreibe in Euro und Cent.',
     view: slot => <div className="tk-line">{euro(e * 100 + c)} € = {slot(0)} € {slot(1)} ct</div>,
-    answers: [String(e), String(c)], solution: `${euro(e * 100 + c)} € = ${e} € ${c} ct`,
+    answers: [String(e), String(c)], hint: 'Vor dem Komma stehen die Euro, nach dem Komma die Cent. 0,05 € sind 5 ct.',
+    solution: `${euro(e * 100 + c)} € = ${e} € ${c} ct`,
   };
 };
 
@@ -319,7 +338,8 @@ const centInEuro = (): Task => {
   return {
     id: `ce${cents}`, topic: 'geld', prompt: 'Wie viel Euro sind das?',
     view: slot => <div className="tk-line">{cents} ct = {slot(0)} €</div>,
-    answers: [euro(cents)], comma: true, solution: `${cents} ct = ${euro(cents)} €`,
+    answers: [euro(cents)], comma: true, hint: '100 ct sind 1 €. Die letzten zwei Ziffern sind die Cent, sie stehen nach dem Komma.',
+    solution: `${cents} ct = ${euro(cents)} €`,
   };
 };
 
@@ -330,7 +350,8 @@ const muenzenZaehlen = (): Task => {
   return {
     id: `mz${items.join('-')}`, topic: 'geld', prompt: 'Wie viel Geld ist das?',
     view: slot => <><MoneyPile items={items} /><div className="tk-line">{slot(0)} €</div></>,
-    answers: [euro(total)], comma: true, solution: `Zusammen ${euro(total)} €`,
+    answers: [euro(total)], comma: true, hint: 'Zähle zuerst die Scheine und Euro-Münzen, dann die Cent. 100 ct sind 1 €.',
+    solution: `Zusammen ${euro(total)} €`,
   };
 };
 
@@ -352,7 +373,8 @@ const einkauf = (): Task => {
           <div className="tk-line">{slot(0)} €</div>
         </div>
       ),
-      answers: [euro(pa + pb)], comma: true, solution: `${euro(pa)} € + ${euro(pb)} € = ${euro(pa + pb)} €`,
+      answers: [euro(pa + pb)], comma: true, hint: 'Rechne beide Preise zusammen: erst die Euro, dann die Cent. 100 ct sind 1 €.',
+    solution: `${euro(pa)} € + ${euro(pb)} € = ${euro(pa + pb)} €`,
     };
   }
   const paid = [500, 1000, 2000].find(p => p > pa) ?? 2000;
@@ -365,7 +387,8 @@ const einkauf = (): Task => {
         <div className="tk-line">{slot(0)} €</div>
       </div>
     ),
-    answers: [euro(paid - pa)], comma: true, solution: `${paid / 100},00 € − ${euro(pa)} € = ${euro(paid - pa)} €`,
+    answers: [euro(paid - pa)], comma: true, hint: 'Rückgeld: Rechne vom Preis aus bis zu dem Geld, mit dem bezahlt wird.',
+    solution: `${paid / 100},00 € − ${euro(pa)} € = ${euro(paid - pa)} €`,
   };
 };
 

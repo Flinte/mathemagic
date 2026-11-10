@@ -1826,7 +1826,7 @@ body.with-keypad .game-page {
   grid-template-areas: ". top ." "left center right" ". bottom .";
   font-size: clamp(1.3rem, 5.5vw, 2rem); font-weight: 800;
 }
-.cross-cell { min-width: 3.6ch; padding: 6px; border: 2px solid #94a3b8; border-radius: 8px; background: white; display: flex; justify-content: center; }
+.cross-cell { position: relative; min-width: 3.6ch; padding: 6px; border: 2px solid #94a3b8; border-radius: 8px; background: white; display: flex; justify-content: center; }
 .cross-cell.center { background: #fef3c7; }
 
 .strip { display: flex; flex-wrap: wrap; justify-content: center; }
@@ -1843,3 +1843,22 @@ body.with-keypad .game-page {
 .exam-list li.right { color: #15803d; }
 .exam-list li.wrong { color: #b91c1c; }
 .exam-tip { margin: 0; background: #fef9c3; color: #854d0e; border-radius: 10px; padding: 0.6rem 1rem; font-weight: 700; text-align: center; }
+
+.cross-op {
+  position: absolute; top: -9px; left: -6px;
+  background: #475569; color: white; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 800; padding: 1px 6px; line-height: 1.3;
+}
+
+/* Hilfe, Tipp, fehlende Felder, Loesung im Feld */
+.tk-feedback-area { flex-direction: column; align-items: center; gap: 0.5rem; }
+.tk-feedback.tip { background: #e0f2fe; color: #075985; font-weight: 600; max-width: 560px; }
+.tk-tip-small { font-weight: 500; font-size: 0.95rem; }
+.tk-help {
+  border: 2px dashed #94a3b8; background: transparent; color: #475569;
+  border-radius: 999px; padding: 0.35rem 1rem; font: inherit; font-weight: 700; cursor: pointer;
+}
+.tk-help:hover { background: #f1f5f9; }
+.tk-input.missing { border-bottom-color: #f59e0b; background: #fffbeb; animation: missingPulse 1s ease-in-out 2; }
+@keyframes missingPulse { 50% { box-shadow: 0 0 0 4px rgba(245,158,11,0.35); } }
+.tk-input.solution { border-bottom-color: #22c55e; color: #15803d; background: #dcfce7; }
