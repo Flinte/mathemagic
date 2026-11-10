@@ -73,6 +73,18 @@ export const WorldMap = ({ stickers, onOpenTown, onOpenSchool, onReset }: Props)
             }}
             overlay={place => (
               <>
+                {/* Goldener, sanft pulsierender Rahmen um jedes Stadt-Plateau — zeigt
+                    auch auf dem Handy, wo man hintippen kann. Die Ecken liegen eine
+                    halbe Kachel ausserhalb der aeussersten Felder. */}
+                <svg className="town-glow" aria-hidden="true">
+                  {layout.towns.map(t => {
+                    const e = t.size - 0.5;
+                    const pts = [[-0.5, -0.5], [e, -0.5], [e, e], [-0.5, e]]
+                      .map(([dc, dr]) => place(t.c + dc, t.r + dr, t.h))
+                      .map(p => `${p.left},${p.top}`).join(' ');
+                    return <polygon key={t.id} points={pts} />;
+                  })}
+                </svg>
                 {layout.animals.filter(a => total >= a.threshold).map(a => {
                   const { left, top, scale } = place(a.c, a.r, a.z);
                   return <span key={a.emoji} className="iso-animal" style={{ left, top, fontSize: Math.max(14, 150 * scale) }}>{a.emoji}</span>;
